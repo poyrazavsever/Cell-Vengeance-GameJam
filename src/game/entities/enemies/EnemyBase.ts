@@ -6,7 +6,7 @@ import { Player } from "../player/Player";
 
 type EnemyDeathHandler = (enemy: EnemyBase) => void;
 
-const ENEMY_BASE_SCALE = 0.32;
+const ENEMY_BASE_SCALE = 0.42;
 const ENEMY_BODY_WIDTH_RATIO = 0.56;
 const ENEMY_BODY_HEIGHT_RATIO = 0.66;
 const ENEMY_BODY_BOTTOM_TRIM_RATIO = 0.07;

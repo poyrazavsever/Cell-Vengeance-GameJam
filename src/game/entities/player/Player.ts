@@ -2,7 +2,7 @@ import { Physics, Scene } from "phaser";
 import { PLAYER_EVOLUTION_TEXTURES } from "../../constants/assetKeys";
 import { getPlayerAnimationKey, PlayerAnimationAction } from "../../animations/playerAnimations";
 
-const BASE_SCALE = 0.32;
+const BASE_SCALE = 0.48;
 const BODY_WIDTH_RATIO = 0.56;
 const BODY_HEIGHT_RATIO = 0.62;
 const BODY_BOTTOM_TRIM_RATIO = 0.08;

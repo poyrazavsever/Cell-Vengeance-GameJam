@@ -24,6 +24,8 @@ interface MovementKeys extends Phaser.Types.Input.Keyboard.CursorKeys {
 
 const PLAYER_SPAWN = { x: 120, y: 620 };
 const PLAYER_ATTACK_DURATION_MS = 140;
+const WORLD_WIDTH = 6400;
+const WORLD_HEIGHT = 768;
 
 export class GameScene extends Scene {
     private cursors!: MovementKeys;
@@ -46,7 +48,8 @@ export class GameScene extends Scene {
     }
 
     create(): void {
-        this.physics.world.setBounds(0, 0, this.scale.width, this.scale.height);
+        this.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+        this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 
         this.drawBackground();
         this.createRuntimeTextures();
@@ -62,12 +65,13 @@ export class GameScene extends Scene {
         this.createEnemyManager();
         this.bindCombat();
         this.bindProgressState();
+        this.configureCamera();
 
-        this.add.text(20, 128, "J: Attack | Space/W: Jump | Shift: Dash | E: +5 Cell Point", {
+        this.add.text(20, 128, "A/D or Left/Right: Move | J: Attack | Space/W: Jump | Shift: Dash", {
             color: "#d7f6ff",
             fontFamily: "Verdana",
             fontSize: "18px"
-        }).setDepth(10);
+        }).setDepth(10).setScrollFactor(0);
 
         EventBus.emit(EVENT_KEYS.CURRENT_SCENE_READY, this);
 
@@ -93,7 +97,6 @@ export class GameScene extends Scene {
     private handlePlayerInput(time: number): void {
         const snapshot = gameState.getSnapshot();
         let direction = 0;
-
         if (this.cursors.left.isDown || this.cursors.leftAlt.isDown) {
             direction = -1;
         } else if (this.cursors.right.isDown || this.cursors.rightAlt.isDown) {
@@ -102,7 +105,7 @@ export class GameScene extends Scene {
 
         const canDash = snapshot.evolutionLevel >= 2;
         const baseSpeed = canDash ? 270 : 210;
-        const dashBonus = canDash && this.cursors.dash.isDown ? 120 : 0;
+        const dashBonus = canDash && this.cursors.dash.isDown && direction !== 0 ? 120 : 0;
         this.player.moveHorizontal(direction, baseSpeed + dashBonus);
 
         if (Input.Keyboard.JustDown(this.cursors.attack)) {
@@ -137,11 +140,27 @@ export class GameScene extends Scene {
 
     private createLevel(): void {
         this.platforms = this.physics.add.staticGroup();
-        this.platforms.create(512, 752, "platform-lg");
-        this.platforms.create(210, 600, "platform-md");
-        this.platforms.create(520, 500, "platform-sm");
-        this.platforms.create(830, 620, "platform-md");
-        this.platforms.create(900, 420, "platform-sm");
+
+        for (let x = 310; x <= WORLD_WIDTH; x += 620) {
+            this.platforms.create(x, 752, "platform-lg");
+        }
+
+        const lanePattern = [
+            { key: "platform-md", y: 620 },
+            { key: "platform-sm", y: 500 },
+            { key: "platform-md", y: 560 },
+            { key: "platform-sm", y: 430 }
+        ];
+
+        for (let i = 0; i < 11; i += 1) {
+            const x = 420 + i * 520;
+            const pattern = lanePattern[i % lanePattern.length];
+            this.platforms.create(x, pattern.y, pattern.key);
+
+            if (i % 2 === 0) {
+                this.platforms.create(x + 180, pattern.y - 95, "platform-sm");
+            }
+        }
     }
 
     private createPlayer(): void {
@@ -208,6 +227,12 @@ export class GameScene extends Scene {
             const value = pickupObject.getData("value") as number | undefined;
             pickupObject.destroy();
             gameState.addCellPoints(value ?? 1);
+        });
+
+        this.time.addEvent({
+            delay: 1400,
+            loop: true,
+            callback: () => this.spawnPickup()
         });
     }
 
@@ -469,7 +494,24 @@ export class GameScene extends Scene {
     }
 
     private drawBackground(): void {
-        this.add.rectangle(512, 384, 1024, 768, 0x08131b);
-        this.add.rectangle(512, 200, 1024, 320, 0x0e2734, 0.55);
+        this.add.rectangle(WORLD_WIDTH * 0.5, 384, WORLD_WIDTH, WORLD_HEIGHT, 0x08131b);
+        this.add.rectangle(WORLD_WIDTH * 0.5, 200, WORLD_WIDTH, 320, 0x0e2734, 0.55);
+    }
+
+    private configureCamera(): void {
+        this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
+        this.cameras.main.setDeadzone(360, 320);
+        this.cameras.main.setFollowOffset(-180, 0);
+    }
+
+    private spawnPickup(): void {
+        const minX = Phaser.Math.Clamp(this.player.x + 240, 60, WORLD_WIDTH - 80);
+        const maxX = Phaser.Math.Clamp(this.player.x + 760, 80, WORLD_WIDTH - 60);
+        const spawnX = Phaser.Math.Between(Math.min(minX, maxX), Math.max(minX, maxX));
+        const pickup = this.pickups.create(spawnX, 20, "cell-point") as Phaser.Physics.Arcade.Image;
+
+        pickup.setBounce(0.25);
+        pickup.setDrag(20, 0);
+        pickup.setData("value", 2);
     }
 }
