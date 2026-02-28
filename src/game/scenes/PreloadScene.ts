@@ -30,6 +30,8 @@ export class PreloadScene extends Scene {
         });
 
         this.load.image(ASSET_KEYS.LOGO, "assets/logo.png");
+        this.load.image(ASSET_KEYS.MENU_BG, "bg.png");
+        this.load.image(ASSET_KEYS.TEXT_LOGO, "textLogo.png");
         this.load.spritesheet(ASSET_KEYS.PLAYER_LEVEL_1, "assets/characters/1.png", { frameWidth: PLAYER_FRAME_SIZE, frameHeight: PLAYER_FRAME_SIZE });
         this.load.spritesheet(ASSET_KEYS.PLAYER_LEVEL_2, "assets/characters/2.png", { frameWidth: PLAYER_FRAME_SIZE, frameHeight: PLAYER_FRAME_SIZE });
         this.load.spritesheet(ASSET_KEYS.PLAYER_LEVEL_3, "assets/characters/3.png", { frameWidth: PLAYER_FRAME_SIZE, frameHeight: PLAYER_FRAME_SIZE });
@@ -38,6 +40,7 @@ export class PreloadScene extends Scene {
         this.load.spritesheet(ASSET_KEYS.ENEMY_SCOUT, "assets/enemy/Scout.png", { frameWidth: ENEMY_FRAME_SIZE, frameHeight: ENEMY_FRAME_SIZE });
         this.load.spritesheet(ASSET_KEYS.ENEMY_SPITTER, "assets/enemy/Spitter.png", { frameWidth: ENEMY_FRAME_SIZE, frameHeight: ENEMY_FRAME_SIZE });
         this.load.spritesheet(ASSET_KEYS.ENEMY_BRUTE, "assets/enemy/Brute.png", { frameWidth: ENEMY_FRAME_SIZE, frameHeight: ENEMY_FRAME_SIZE });
+        this.load.audio(ASSET_KEYS.BGM_MENU, "sound/bg.mp3");
         this.load.audio(ASSET_KEYS.SFX_PLAYER_WALK, "sound/mainCharacter/walking.mp3");
         this.load.audio(ASSET_KEYS.SFX_PLAYER_JUMP, "sound/mainCharacter/jump.mp3");
         this.load.audio(ASSET_KEYS.SFX_PLAYER_ATTACK, "sound/mainCharacter/attack.mp3");

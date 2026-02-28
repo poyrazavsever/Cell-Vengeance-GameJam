@@ -11,6 +11,7 @@ import { AcidProjectile } from "../entities/projectiles/AcidProjectile";
 import { Player } from "../entities/player/Player";
 import { EventBus } from "../EventBus";
 import { gameState } from "../state/GameState";
+import { stopMenuMusic } from "../services/menuMusic";
 import { EnemyManager } from "../systems/EnemyManager";
 import { DamageSource } from "../types/combat";
 import { LevelDefinition } from "../types/level";
@@ -67,6 +68,7 @@ export class GameScene extends Scene {
     }
 
     create(): void {
+        stopMenuMusic(this);
         gameState.startLevel(this.level.id);
 
         this.physics.world.setBounds(0, 0, this.level.worldWidth, WORLD_HEIGHT);
@@ -90,13 +92,13 @@ export class GameScene extends Scene {
         this.configureCamera();
         this.ensureHudScene();
 
-        this.add.text(20, 152, "A/D or Left/Right: Move | J: Attack | Space/W: Jump | Shift: Dash", {
+        this.add.text(20, 152, "A/D veya Sol/Sağ: Hareket | J: Saldırı | Space/W: Zıpla | Shift: Dash", {
             color: "#d7f6ff",
             fontFamily: "Verdana",
             fontSize: "18px"
         }).setDepth(10).setScrollFactor(0);
 
-        this.doorHintText = this.add.text(512, 188, "Kapiya girmek icin Enter bas", {
+        this.doorHintText = this.add.text(512, 188, "Kapıya girmek için Enter bas", {
             color: "#c8f7ff",
             fontFamily: "Verdana",
             fontSize: "19px",

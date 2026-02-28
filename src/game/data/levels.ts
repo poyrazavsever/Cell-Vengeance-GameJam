@@ -59,7 +59,7 @@ const level3Platforms: LevelPlatform[] = [
 export const LEVELS: Record<1 | 2 | 3, LevelDefinition> = {
     1: {
         id: 1,
-        name: "Bolum 1 - Egitim Lab",
+        name: "Bölüm 1 - Eğitim Lab",
         worldWidth: 2400,
         spawn: { x: 140, y: 620 },
         door: { x: 2280, y: 676 },
@@ -71,7 +71,7 @@ export const LEVELS: Record<1 | 2 | 3, LevelDefinition> = {
     },
     2: {
         id: 2,
-        name: "Bolum 2 - Gelisim Koridoru",
+        name: "Bölüm 2 - Gelişim Koridoru",
         worldWidth: 3400,
         spawn: { x: 140, y: 620 },
         door: { x: 3280, y: 676 },
@@ -85,7 +85,7 @@ export const LEVELS: Record<1 | 2 | 3, LevelDefinition> = {
     },
     3: {
         id: 3,
-        name: "Bolum 3 - Final Laboratuvari",
+        name: "Bölüm 3 - Final Laboratuvarı",
         worldWidth: 4600,
         spawn: { x: 140, y: 620 },
         door: { x: 4480, y: 676 },

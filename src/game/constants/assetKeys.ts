@@ -1,5 +1,7 @@
 export const ASSET_KEYS = {
     LOGO: "logo",
+    MENU_BG: "menu-bg",
+    TEXT_LOGO: "text-logo",
     PLAYER_LEVEL_1: "player-level-1",
     PLAYER_LEVEL_2: "player-level-2",
     PLAYER_LEVEL_3: "player-level-3",
@@ -8,6 +10,7 @@ export const ASSET_KEYS = {
     ENEMY_SCOUT: "enemy-scout",
     ENEMY_SPITTER: "enemy-spitter",
     ENEMY_BRUTE: "enemy-brute",
+    BGM_MENU: "bgm-menu",
     SFX_PLAYER_WALK: "sfx-player-walk",
     SFX_PLAYER_JUMP: "sfx-player-jump",
     SFX_PLAYER_ATTACK: "sfx-player-attack",

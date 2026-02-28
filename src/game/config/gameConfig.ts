@@ -1,5 +1,14 @@
 import { AUTO, Types } from "phaser";
-import { BootScene, GameScene, HudScene, LevelCompleteScene, MainMenuScene, PreloadScene } from "../scenes";
+import {
+    BootScene,
+    GameScene,
+    HudScene,
+    LevelCompleteScene,
+    LevelSelectScene,
+    MainMenuScene,
+    PreloadScene,
+    SettingsScene
+} from "../scenes";
 
 export const gameConfig: Types.Core.GameConfig = {
     type: AUTO,
@@ -14,5 +23,5 @@ export const gameConfig: Types.Core.GameConfig = {
             debug: false
         }
     },
-    scene: [BootScene, PreloadScene, MainMenuScene, GameScene, HudScene, LevelCompleteScene]
+    scene: [BootScene, PreloadScene, MainMenuScene, LevelSelectScene, SettingsScene, GameScene, HudScene, LevelCompleteScene]
 };

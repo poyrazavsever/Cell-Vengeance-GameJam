@@ -35,13 +35,13 @@ export class HudScene extends Scene {
             fontSize: "18px"
         }).setScrollFactor(0);
 
-        this.stageText = this.add.text(20, 98, "Form: Hucre Formu", {
+        this.stageText = this.add.text(20, 98, "Form: Hücre Formu", {
             color: "#90d8ff",
             fontFamily: "Verdana",
             fontSize: "16px"
         }).setScrollFactor(0);
 
-        this.walletText = this.add.text(20, 122, "Cuzdan: 0", {
+        this.walletText = this.add.text(20, 122, "Cüzdan: 0", {
             color: "#ffe1aa",
             fontFamily: "Verdana",
             fontSize: "16px"
@@ -55,11 +55,11 @@ export class HudScene extends Scene {
 
     private handleProgressUpdated(snapshot: GameSnapshot): void {
         this.healthText.setText(`HP: ${snapshot.run.health}/${snapshot.run.maxHealth}`);
-        this.pointsText.setText(`Run Point: ${snapshot.run.runPoints}`);
+        this.pointsText.setText(`Bölüm Puanı: ${snapshot.run.runPoints}`);
         this.levelText.setText(`Evrim: Lv${snapshot.stats.evolutionLevel}`);
 
         const currentStage = EVOLUTION_STAGES.find((stage) => stage.level === snapshot.stats.evolutionLevel);
         this.stageText.setText(`Form: ${currentStage?.label ?? "Bilinmiyor"}`);
-        this.walletText.setText(`Cuzdan: ${snapshot.profile.walletPoints}`);
+        this.walletText.setText(`Cüzdan: ${snapshot.profile.walletPoints}`);
     }
 }

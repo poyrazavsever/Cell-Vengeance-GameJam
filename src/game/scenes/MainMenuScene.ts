@@ -1,10 +1,8 @@
 import { Scene } from "phaser";
 import { SCENE_KEYS } from "../constants/sceneKeys";
-import { getLevelById } from "../data/levels";
+import { ensureMenuMusic } from "../services/menuMusic";
 import { gameState } from "../state/GameState";
-import { LevelId } from "../types/progression";
-
-const LEVEL_IDS: LevelId[] = [1, 2, 3];
+import { createMenuButton, createMenuCard, createMenuLabel, drawMenuBackground, drawMenuHeader } from "../ui/menuTheme";
 
 export class MainMenuScene extends Scene {
     constructor() {
@@ -13,71 +11,72 @@ export class MainMenuScene extends Scene {
 
     create(): void {
         const snapshot = gameState.getSnapshot();
+        ensureMenuMusic(this);
 
-        this.add.rectangle(512, 384, 1024, 768, 0x071521);
-        this.add.rectangle(512, 110, 760, 120, 0x103247, 0.9).setStrokeStyle(2, 0x63bdd7, 0.9);
+        drawMenuBackground(this);
+        drawMenuHeader(this, "Ana Menü", "Hücresel savaş yeniden başlıyor");
+        this.createWalletBadge(snapshot.profile.walletPoints);
 
-        this.add.text(512, 82, "CELL-VENGEANCE", {
-            fontFamily: "Verdana",
-            fontSize: "44px",
-            color: "#dff7ff"
-        }).setOrigin(0.5);
-
-        this.add.text(512, 126, "Ana Menu", {
-            fontFamily: "Verdana",
-            fontSize: "22px",
-            color: "#8fd8ff"
-        }).setOrigin(0.5);
-
-        this.add.text(512, 178, `Cuzdan: ${snapshot.profile.walletPoints} CP`, {
-            fontFamily: "Verdana",
-            fontSize: "20px",
-            color: "#ffe3a6"
-        }).setOrigin(0.5);
-
-        this.createButton(512, 236, "Devam Et", () => {
-            const targetLevel = snapshot.profile.selectedLevel <= snapshot.profile.unlockedLevel
-                ? snapshot.profile.selectedLevel
-                : snapshot.profile.unlockedLevel;
-            this.startLevel(targetLevel);
+        createMenuCard(this, { x: 512, y: 564, width: 560, height: 248 });
+        createMenuButton(this, {
+            x: 512,
+            y: 500,
+            width: 420,
+            height: 54,
+            fontSize: 25,
+            label: "Kaldığın Yerden Devam Et",
+            onClick: () => {
+                const nextSnapshot = gameState.getSnapshot();
+                const targetLevel = nextSnapshot.profile.selectedLevel <= nextSnapshot.profile.unlockedLevel
+                    ? nextSnapshot.profile.selectedLevel
+                    : nextSnapshot.profile.unlockedLevel;
+                this.startLevel(targetLevel);
+            }
+        });
+        createMenuButton(this, {
+            x: 512,
+            y: 572,
+            width: 420,
+            height: 50,
+            fontSize: 22,
+            label: "Bölüm Seçimi",
+            onClick: () => this.scene.start(SCENE_KEYS.LEVEL_SELECT)
+        });
+        createMenuButton(this, {
+            x: 512,
+            y: 636,
+            width: 420,
+            height: 50,
+            fontSize: 22,
+            label: "Ayarlar",
+            onClick: () => this.scene.start(SCENE_KEYS.SETTINGS)
         });
 
-        this.add.text(512, 300, "Bolum Secimi", {
-            fontFamily: "Verdana",
-            fontSize: "24px",
-            color: "#9cdfff"
-        }).setOrigin(0.5);
-
-        LEVEL_IDS.forEach((levelId, index) => {
-            const level = getLevelById(levelId);
-            const isPlayable = gameState.canPlayLevel(levelId);
-            const y = 362 + index * 96;
-            const label = `B${levelId}: ${level.name}`;
-
-            this.createButton(
-                512,
-                y,
-                label,
-                () => this.startLevel(levelId),
-                isPlayable
-            );
-        });
-
-        this.createButton(512, 662, "Tum Ilerlemeyi Sifirla", () => {
-            gameState.resetAllProgress();
-            this.scene.restart();
+        createMenuButton(this, {
+            x: 512,
+            y: 744,
+            width: 320,
+            height: 40,
+            fontSize: 16,
+            label: "Tüm İlerlemeyi Sıfırla",
+            onClick: () => {
+                gameState.resetAllProgress();
+                this.scene.restart();
+            }
         });
 
         if (snapshot.profile.finaleSeen) {
-            this.add.text(512, 608, "Oyunun devami gelecek. Tum bolumler secilebilir.", {
+            this.add.text(512, 686, "Final açıldı. Bölüm seçiminden istediğin bölümü oynayabilirsin.", {
                 fontFamily: "Verdana",
-                fontSize: "18px",
-                color: "#9be6b0"
+                fontSize: "16px",
+                color: "#9be6b0",
+                stroke: "#041822",
+                strokeThickness: 3
             }).setOrigin(0.5);
         }
     }
 
-    private startLevel(levelId: LevelId): void {
+    private startLevel(levelId: 1 | 2 | 3): void {
         if (!gameState.setSelectedLevel(levelId)) {
             return;
         }
@@ -86,36 +85,8 @@ export class MainMenuScene extends Scene {
         this.scene.start(SCENE_KEYS.GAME, { levelId });
     }
 
-    private createButton(
-        x: number,
-        y: number,
-        text: string,
-        onClick: () => void,
-        enabled = true
-    ): Phaser.GameObjects.Text {
-        const button = this.add.text(x, y, text, {
-            fontFamily: "Verdana",
-            fontSize: "22px",
-            color: enabled ? "#f0fbff" : "#5a7482",
-            backgroundColor: enabled ? "#1b4f67" : "#1d2830",
-            padding: {
-                left: 16,
-                right: 16,
-                top: 8,
-                bottom: 8
-            }
-        }).setOrigin(0.5);
-
-        if (!enabled) {
-            return button;
-        }
-
-        button
-            .setInteractive({ useHandCursor: true })
-            .on("pointerover", () => button.setStyle({ color: "#0c1a22", backgroundColor: "#95ebff" }))
-            .on("pointerout", () => button.setStyle({ color: "#f0fbff", backgroundColor: "#1b4f67" }))
-            .on("pointerdown", onClick);
-
-        return button;
+    private createWalletBadge(walletPoints: number): void {
+        createMenuCard(this, { x: 874, y: 46, width: 280, height: 74, alpha: 0.94 });
+        createMenuLabel(this, 874, 46, `Cüzdan: ${walletPoints} CP`, 24, "#ffe6a8");
     }
 }

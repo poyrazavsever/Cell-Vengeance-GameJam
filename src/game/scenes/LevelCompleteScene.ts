@@ -3,8 +3,10 @@ import { EventBus } from "../EventBus";
 import { EVENT_KEYS } from "../constants/eventKeys";
 import { SCENE_KEYS } from "../constants/sceneKeys";
 import { SHOP_CATALOG, SHOP_ORDER } from "../data/shopCatalog";
+import { ensureMenuMusic } from "../services/menuMusic";
 import { gameState } from "../state/GameState";
 import { LevelCompletionResult, LevelId, UpgradeKey } from "../types/progression";
+import { MenuButtonApi, createMenuButton, createMenuCard, createMenuLabel, drawMenuBackground, drawMenuHeader } from "../ui/menuTheme";
 
 interface LevelCompleteData extends Partial<LevelCompletionResult> {}
 
@@ -12,7 +14,7 @@ interface ShopRow {
     key: UpgradeKey;
     levelText: Phaser.GameObjects.Text;
     costText: Phaser.GameObjects.Text;
-    buyButton: Phaser.GameObjects.Text;
+    buyButton: MenuButtonApi;
 }
 
 export class LevelCompleteScene extends Scene {
@@ -37,56 +39,56 @@ export class LevelCompleteScene extends Scene {
     }
 
     create(): void {
-        this.add.rectangle(512, 384, 1024, 768, 0x08171f);
-        this.add.rectangle(512, 96, 900, 150, 0x123445, 0.9).setStrokeStyle(2, 0x68c2dd, 0.9);
-
-        this.add.text(512, 56, `Bolum ${this.payload.levelId} Tamamlandi`, {
-            fontFamily: "Verdana",
-            fontSize: "38px",
-            color: "#e8fbff"
-        }).setOrigin(0.5);
-
-        this.add.text(512, 94, `Kazanilan: +${this.payload.earned} CP`, {
-            fontFamily: "Verdana",
-            fontSize: "22px",
-            color: "#b2ecff"
-        }).setOrigin(0.5);
-
-        this.walletText = this.add.text(512, 124, `Cuzdan: ${gameState.getSnapshot().profile.walletPoints} CP`, {
-            fontFamily: "Verdana",
-            fontSize: "22px",
-            color: "#ffe1a0"
-        }).setOrigin(0.5);
-
-        this.add.text(512, 178, "Market - Evrim ve guclendirmeler", {
-            fontFamily: "Verdana",
-            fontSize: "26px",
-            color: "#9fdfff"
-        }).setOrigin(0.5);
+        ensureMenuMusic(this);
+        drawMenuBackground(this);
+        drawMenuHeader(this, `Bölüm ${this.payload.levelId} Tamamlandı`, "Market ekranında güçlen");
+        createMenuLabel(this, 512, 362, `Kazanılan: +${this.payload.earned} CP`, 24, "#b2ecff");
+        this.walletText = createMenuLabel(this, 512, 392, `Cüzdan: ${gameState.getSnapshot().profile.walletPoints} CP`, 24, "#ffe1a0");
+        createMenuCard(this, { x: 512, y: 566, width: 932, height: 372 });
+        createMenuLabel(this, 512, 425, "Market - Evrim ve güçlendirmeler", 24, "#9fdfff");
 
         this.createShopRows();
         this.refreshShopRows();
 
-        this.createButton(270, 710, "Ana Menuye Don", () => {
-            this.scene.start(SCENE_KEYS.MAIN_MENU);
+        createMenuButton(this, {
+            x: 270,
+            y: 730,
+            width: 320,
+            height: 52,
+            fontSize: 21,
+            label: "Ana Menüye Dön",
+            onClick: () => {
+                this.scene.start(SCENE_KEYS.MAIN_MENU);
+            }
         });
 
         if (this.payload.levelId < 3 && this.payload.nextLevel) {
-            this.createButton(754, 710, "Siradaki Bolum ile Devam Et", () => {
-                const nextLevel = this.payload.nextLevel as LevelId;
-                gameState.setSelectedLevel(nextLevel);
-                gameState.startLevel(nextLevel);
-                this.scene.start(SCENE_KEYS.GAME, { levelId: nextLevel });
+            createMenuButton(this, {
+                x: 754,
+                y: 730,
+                width: 420,
+                height: 52,
+                fontSize: 20,
+                label: "Sıradaki Bölüm ile Devam Et",
+                onClick: () => {
+                    const nextLevel = this.payload.nextLevel as LevelId;
+                    gameState.setSelectedLevel(nextLevel);
+                    gameState.startLevel(nextLevel);
+                    this.scene.start(SCENE_KEYS.GAME, { levelId: nextLevel });
+                }
             });
         } else {
-            this.add.text(512, 654, "Oyunun devami gelecek.", {
-                fontFamily: "Verdana",
-                fontSize: "26px",
-                color: "#9de4ae"
-            }).setOrigin(0.5);
-
-            this.createButton(754, 710, "Serbest Bolum Secimi", () => {
-                this.scene.start(SCENE_KEYS.MAIN_MENU);
+            createMenuLabel(this, 754, 700, "Oyunun devamı gelecek", 20, "#9de4ae");
+            createMenuButton(this, {
+                x: 754,
+                y: 730,
+                width: 340,
+                height: 52,
+                fontSize: 20,
+                label: "Serbest Bölüm Seçimi",
+                onClick: () => {
+                    this.scene.start(SCENE_KEYS.LEVEL_SELECT);
+                }
             });
         }
     }
@@ -95,45 +97,60 @@ export class LevelCompleteScene extends Scene {
         this.rows = [];
         SHOP_ORDER.forEach((key, index) => {
             const item = SHOP_CATALOG[key];
-            const y = 230 + index * 62;
+            const y = 468 + index * 40;
 
-            this.add.text(84, y, item.label, {
+            this.add.text(82, y - 12, item.label, {
                 fontFamily: "Verdana",
-                fontSize: "20px",
-                color: "#e7f9ff"
+                fontSize: "18px",
+                color: "#e7f9ff",
+                fontStyle: "bold",
+                stroke: "#041822",
+                strokeThickness: 3
             });
 
-            this.add.text(84, y + 22, item.description, {
+            this.add.text(82, y + 8, item.description, {
                 fontFamily: "Verdana",
-                fontSize: "14px",
+                fontSize: "13px",
                 color: "#81bbcf"
             });
 
-            const levelText = this.add.text(520, y + 8, "Lv 0/0", {
+            const levelText = this.add.text(560, y - 2, "Lv 0/0", {
                 fontFamily: "Verdana",
-                fontSize: "18px",
-                color: "#d7f3ff"
+                fontSize: "16px",
+                color: "#d7f3ff",
+                stroke: "#041822",
+                strokeThickness: 3
             }).setOrigin(0.5);
 
-            const costText = this.add.text(660, y + 8, "0 CP", {
+            const costText = this.add.text(690, y - 2, "0 CP", {
                 fontFamily: "Verdana",
-                fontSize: "18px",
-                color: "#ffe8b8"
+                fontSize: "16px",
+                color: "#ffe8b8",
+                stroke: "#041822",
+                strokeThickness: 3
             }).setOrigin(0.5);
 
-            const buyButton = this.createButton(870, y + 8, "Satin Al", () => {
-                const result = gameState.purchaseUpgrade(key);
-                if (!result.ok) {
-                    return;
+            const buyButton = createMenuButton(this, {
+                x: 856,
+                y: y - 2,
+                width: 145,
+                height: 38,
+                fontSize: 16,
+                label: "Satın Al",
+                onClick: () => {
+                    const result = gameState.purchaseUpgrade(key);
+                    if (!result.ok) {
+                        return;
+                    }
+
+                    EventBus.emit(EVENT_KEYS.SHOP_PURCHASED, {
+                        key,
+                        level: result.newLevel,
+                        cost: result.cost
+                    });
+                    EventBus.emit(EVENT_KEYS.PROFILE_UPDATED, gameState.getSnapshot().profile);
+                    this.refreshShopRows();
                 }
-
-                EventBus.emit(EVENT_KEYS.SHOP_PURCHASED, {
-                    key,
-                    level: result.newLevel,
-                    cost: result.cost
-                });
-                EventBus.emit(EVENT_KEYS.PROFILE_UPDATED, gameState.getSnapshot().profile);
-                this.refreshShopRows();
             });
 
             this.rows.push({ key, levelText, costText, buyButton });
@@ -142,7 +159,7 @@ export class LevelCompleteScene extends Scene {
 
     private refreshShopRows(): void {
         const snapshot = gameState.getSnapshot();
-        this.walletText.setText(`Cuzdan: ${snapshot.profile.walletPoints} CP`);
+        this.walletText.setText(`Cüzdan: ${snapshot.profile.walletPoints} CP`);
 
         this.rows.forEach((row) => {
             const item = SHOP_CATALOG[row.key];
@@ -155,65 +172,19 @@ export class LevelCompleteScene extends Scene {
             row.costText.setText(isMaxed ? "MAX" : `${cost} CP`);
 
             if (isMaxed) {
-                this.disableButton(row.buyButton, "MAX");
-            } else if (!canBuy) {
-                this.disableButton(row.buyButton, "Yetersiz");
-            } else {
-                this.enableButton(row.buyButton, "Satin Al");
+                row.buyButton.setEnabled(false);
+                row.buyButton.setLabel("MAX");
+                return;
             }
-        });
-    }
 
-    private createButton(x: number, y: number, label: string, onClick: () => void): Phaser.GameObjects.Text {
-        const button = this.add.text(x, y, label, {
-            fontFamily: "Verdana",
-            fontSize: "18px",
-            color: "#effcff",
-            backgroundColor: "#1e546a",
-            padding: {
-                left: 10,
-                right: 10,
-                top: 6,
-                bottom: 6
+            if (!canBuy) {
+                row.buyButton.setEnabled(false);
+                row.buyButton.setLabel("Yetersiz");
+                return;
             }
-        }).setOrigin(0.5);
 
-        button.setData("enabled", true);
-        button.setInteractive({ useHandCursor: true })
-            .on("pointerover", () => {
-                if (button.getData("enabled")) {
-                    button.setStyle({ color: "#0f1d26", backgroundColor: "#9cecff" });
-                }
-            })
-            .on("pointerout", () => {
-                if (button.getData("enabled")) {
-                    button.setStyle({ color: "#effcff", backgroundColor: "#1e546a" });
-                }
-            })
-            .on("pointerdown", () => {
-                if (button.getData("enabled")) {
-                    onClick();
-                }
-            });
-
-        return button;
-    }
-
-    private disableButton(button: Phaser.GameObjects.Text, label: string): void {
-        button.setData("enabled", false);
-        button.setStyle({
-            color: "#586b74",
-            backgroundColor: "#1d2a31"
+            row.buyButton.setEnabled(true);
+            row.buyButton.setLabel("Satın Al");
         });
-        button.setText(label);
-    }
-
-    private enableButton(button: Phaser.GameObjects.Text, label: string): void {
-        button.setData("enabled", true);
-        button.setStyle({
-            color: "#effcff",
-            backgroundColor: "#1e546a"
-        });
-        button.setText(label);
     }
 }

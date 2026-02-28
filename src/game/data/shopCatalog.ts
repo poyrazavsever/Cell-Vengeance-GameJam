@@ -12,8 +12,8 @@ export interface ShopItem {
 export const SHOP_CATALOG: Record<UpgradeKey, ShopItem> = {
     evolution: {
         key: "evolution",
-        label: "Evrim Artisi",
-        description: "Karakter form seviyeni 1 artirir.",
+        label: "Evrim Artışı",
+        description: "Karakter form seviyeni 1 artırır.",
         baseCost: 12,
         costStep: 8,
         maxLevel: 4
@@ -21,31 +21,31 @@ export const SHOP_CATALOG: Record<UpgradeKey, ShopItem> = {
     maxHp: {
         key: "maxHp",
         label: "Maksimum HP",
-        description: "Maksimum cani 1 artirir.",
+        description: "Maksimum canı 1 artırır.",
         baseCost: 10,
         costStep: 6,
         maxLevel: 3
     },
     attack: {
         key: "attack",
-        label: "Saldiri Gucu",
-        description: "Vurus hasarini 1 artirir.",
+        label: "Saldırı Gücü",
+        description: "Vuruş hasarını 1 artırır.",
         baseCost: 9,
         costStep: 6,
         maxLevel: 3
     },
     moveSpeed: {
         key: "moveSpeed",
-        label: "Hareket Hizi",
-        description: "Temel kosu hizini artirir.",
+        label: "Hareket Hızı",
+        description: "Temel koşu hızını artırır.",
         baseCost: 8,
         costStep: 5,
         maxLevel: 4
     },
     jumpPower: {
         key: "jumpPower",
-        label: "Ziplama",
-        description: "Ziplama gucunu artirir.",
+        label: "Zıplama",
+        description: "Zıplama gücünü artırır.",
         baseCost: 8,
         costStep: 5,
         maxLevel: 4
@@ -53,7 +53,7 @@ export const SHOP_CATALOG: Record<UpgradeKey, ShopItem> = {
     dashBoost: {
         key: "dashBoost",
         label: "Dash Boost",
-        description: "Dash bonus hizini artirir.",
+        description: "Dash bonus hızını artırır.",
         baseCost: 10,
         costStep: 6,
         maxLevel: 3
