@@ -2,6 +2,33 @@ import { Scene } from "phaser";
 import { ASSET_KEYS, ENEMY_FRAME_SIZE, PLAYER_FRAME_SIZE } from "../constants/assetKeys";
 import { SCENE_KEYS } from "../constants/sceneKeys";
 
+interface TiledLayerData {
+    type: string;
+    data?: number[];
+}
+
+interface TiledTilesetRef {
+    firstgid: number;
+    source: string;
+}
+
+interface TiledMapData {
+    layers: TiledLayerData[];
+    tilesets: TiledTilesetRef[];
+}
+
+interface MapTileLookupEntry {
+    key: string;
+    width: number;
+    height: number;
+}
+
+const MAP1_TSX_KEYS: Record<string, string> = {
+    "background.tsx": "map1-tsx-background",
+    "tiles.tsx": "map1-tsx-tiles",
+    "objects.tsx": "map1-tsx-objects"
+};
+
 export class PreloadScene extends Scene {
     private loadingBar!: Phaser.GameObjects.Graphics;
 
@@ -25,14 +52,14 @@ export class PreloadScene extends Scene {
             this.drawLoadingBar(value);
         });
 
-        this.load.on("complete", () => {
-            this.loadingBar.destroy();
-        });
-
         this.load.image(ASSET_KEYS.LOGO, "assets/logo.png");
         this.load.image(ASSET_KEYS.MENU_BG, "bg.png");
         this.load.image(ASSET_KEYS.TEXT_LOGO, "textLogo.png");
         this.load.video(ASSET_KEYS.INTRO_VIDEO, { url: "start.mp4", type: "mp4" }, false);
+        this.load.tilemapTiledJSON(ASSET_KEYS.MAP_LEVEL_1, "maps/map1.json");
+        this.load.text(MAP1_TSX_KEYS["background.tsx"], "maps/background.tsx");
+        this.load.text(MAP1_TSX_KEYS["tiles.tsx"], "maps/tiles.tsx");
+        this.load.text(MAP1_TSX_KEYS["objects.tsx"], "maps/objects.tsx");
         this.load.spritesheet(ASSET_KEYS.PLAYER_LEVEL_1, "assets/characters/1.png", { frameWidth: PLAYER_FRAME_SIZE, frameHeight: PLAYER_FRAME_SIZE });
         this.load.spritesheet(ASSET_KEYS.PLAYER_LEVEL_2, "assets/characters/2.png", { frameWidth: PLAYER_FRAME_SIZE, frameHeight: PLAYER_FRAME_SIZE });
         this.load.spritesheet(ASSET_KEYS.PLAYER_LEVEL_3, "assets/characters/3.png", { frameWidth: PLAYER_FRAME_SIZE, frameHeight: PLAYER_FRAME_SIZE });
@@ -61,6 +88,18 @@ export class PreloadScene extends Scene {
     }
 
     create(): void {
+        const additionalFiles = this.prepareLevel1TilesetImages();
+        if (additionalFiles > 0) {
+            this.drawLoadingBar(0);
+            this.load.once("complete", () => {
+                this.loadingBar.destroy();
+                this.scene.start(SCENE_KEYS.INTRO);
+            });
+            this.load.start();
+            return;
+        }
+
+        this.loadingBar.destroy();
         this.scene.start(SCENE_KEYS.INTRO);
     }
 
@@ -75,5 +114,110 @@ export class PreloadScene extends Scene {
         this.loadingBar.fillRoundedRect(x, y, width, height, 8);
         this.loadingBar.fillStyle(0x43d9b6, 1);
         this.loadingBar.fillRoundedRect(x + 4, y + 4, (width - 8) * progress, height - 8, 6);
+    }
+
+    private prepareLevel1TilesetImages(): number {
+        const mapRaw = this.cache.tilemap.get(ASSET_KEYS.MAP_LEVEL_1);
+        const mapData = mapRaw?.data as TiledMapData | undefined;
+        if (!mapData || !Array.isArray(mapData.layers) || !Array.isArray(mapData.tilesets)) {
+            this.registry.set("map1TileLookup", {});
+            return 0;
+        }
+
+        const usedGids = this.collectUsedGids(mapData);
+        const lookup: Record<string, MapTileLookupEntry> = {};
+        let queuedFiles = 0;
+
+        mapData.tilesets.forEach((tileset) => {
+            const sourceName = tileset.source.split("/").pop() ?? tileset.source;
+            const tsxCacheKey = MAP1_TSX_KEYS[sourceName];
+            if (!tsxCacheKey || !this.cache.text.exists(tsxCacheKey)) {
+                return;
+            }
+
+            const tsxContent = this.cache.text.get(tsxCacheKey) as string;
+            const tileRegex = /<tile[^>]*id="(\d+)"[^>]*>[\s\S]*?<image[^>]*source="([^"]+)"[^>]*width="(\d+)"[^>]*height="(\d+)"[^>]*\/>/g;
+            let match: RegExpExecArray | null = tileRegex.exec(tsxContent);
+
+            while (match) {
+                const gid = tileset.firstgid + Number(match[1]);
+                if (!usedGids.has(gid)) {
+                    match = tileRegex.exec(tsxContent);
+                    continue;
+                }
+
+                const imagePath = this.normalizeTilesetImagePath(match[2]);
+                if (!imagePath) {
+                    match = tileRegex.exec(tsxContent);
+                    continue;
+                }
+
+                const textureKey = `map1-gid-${gid}`;
+                if (!this.textures.exists(textureKey)) {
+                    this.load.image(textureKey, encodeURI(imagePath));
+                    queuedFiles += 1;
+                }
+
+                lookup[String(gid)] = {
+                    key: textureKey,
+                    width: Number(match[3]),
+                    height: Number(match[4])
+                };
+
+                match = tileRegex.exec(tsxContent);
+            }
+        });
+
+        this.registry.set("map1TileLookup", lookup);
+        return queuedFiles;
+    }
+
+    private collectUsedGids(mapData: TiledMapData): Set<number> {
+        const usedGids = new Set<number>();
+        mapData.layers.forEach((layer) => {
+            if (layer.type !== "tilelayer" || !Array.isArray(layer.data)) {
+                return;
+            }
+
+            layer.data.forEach((gid) => {
+                if (gid > 0) {
+                    usedGids.add(gid);
+                }
+            });
+        });
+
+        return usedGids;
+    }
+
+    private normalizeTilesetImagePath(rawSource: string): string | null {
+        const normalized = rawSource.replace(/\\/g, "/");
+        const trimmedRelative = normalized.replace(/^(\.\.\/)+/, "");
+
+        const exclusionMatch = normalized.match(/free-exclusion-zone-tileset-pixel-art\/1 Tiles\/Tile_(\d+)\.png$/i);
+        if (exclusionMatch) {
+            const tileNumber = exclusionMatch[1].padStart(2, "0");
+            return `assets/maps/Free Industrial Zone Tileset/1 Tiles/IndustrialTile_${tileNumber}.png`;
+        }
+
+        const knownPackMatch = normalized.match(/(Free Industrial Zone Tileset\/.+|Cyberpunk platformer - World starter\/.+)$/);
+        if (knownPackMatch) {
+            return `assets/maps/${knownPackMatch[1]}`;
+        }
+
+        if (trimmedRelative.startsWith("assets/")) {
+            return trimmedRelative;
+        }
+
+        const downloadsMarker = "/Downloads/";
+        const markerIndex = normalized.indexOf(downloadsMarker);
+        if (markerIndex >= 0) {
+            return `assets/maps/${normalized.slice(markerIndex + downloadsMarker.length)}`;
+        }
+
+        if (normalized.startsWith("/assets/")) {
+            return normalized.slice(1);
+        }
+
+        return null;
     }
 }

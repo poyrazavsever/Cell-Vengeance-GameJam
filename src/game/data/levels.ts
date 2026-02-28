@@ -60,9 +60,10 @@ export const LEVELS: Record<1 | 2 | 3, LevelDefinition> = {
     1: {
         id: 1,
         name: "Bölüm 1 - Eğitim Lab",
-        worldWidth: 2400,
-        spawn: { x: 140, y: 620 },
-        door: { x: 2280, y: 676 },
+        worldWidth: 4800,
+        // Level 1 map was authored 8 tiles higher (8 * 32px).
+        spawn: { x: 140, y: 364 },
+        door: { x: 4680, y: 676 },
         platformPreset: level1Platforms,
         enemySpawns: [
             { kind: "scout", x: 620, y: 710, patrolMinX: 460, patrolMaxX: 820 },
