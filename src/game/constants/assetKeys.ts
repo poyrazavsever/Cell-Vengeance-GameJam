@@ -4,7 +4,11 @@ export const ASSET_KEYS = {
     PLAYER_LEVEL_2: "player-level-2",
     PLAYER_LEVEL_3: "player-level-3",
     PLAYER_LEVEL_4: "player-level-4",
-    PLAYER_LEVEL_5: "player-level-5"
+    PLAYER_LEVEL_5: "player-level-5",
+    SFX_PLAYER_WALK: "sfx-player-walk",
+    SFX_PLAYER_JUMP: "sfx-player-jump",
+    SFX_PLAYER_ATTACK: "sfx-player-attack",
+    SFX_PLAYER_HIT: "sfx-player-hit"
 } as const;
 
 export const PLAYER_EVOLUTION_TEXTURES = [

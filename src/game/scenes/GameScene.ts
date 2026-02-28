@@ -1,5 +1,6 @@
 import { Input, Scene } from "phaser";
 import { createPlayerAnimations } from "../animations/playerAnimations";
+import { ASSET_KEYS } from "../constants/assetKeys";
 import { EventBus } from "../EventBus";
 import { EVENT_KEYS } from "../constants/eventKeys";
 import { SCENE_KEYS } from "../constants/sceneKeys";
@@ -23,6 +24,7 @@ export class GameScene extends Scene {
     private pickups!: Phaser.Physics.Arcade.Group;
     private unsubscribeState: (() => void) | null = null;
     private previousLevel = 0;
+    private walkSound: Phaser.Sound.BaseSound | null = null;
 
     constructor() {
         super(SCENE_KEYS.GAME);
@@ -37,6 +39,7 @@ export class GameScene extends Scene {
         this.createLevel();
         this.createPlayer();
         this.createInput();
+        this.createCharacterSfx();
         this.createPickups();
         this.bindProgressState();
 
@@ -49,6 +52,9 @@ export class GameScene extends Scene {
         EventBus.emit(EVENT_KEYS.CURRENT_SCENE_READY, this);
 
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+            this.stopWalkSfx();
+            this.walkSound?.destroy();
+            this.walkSound = null;
             this.unsubscribeState?.();
             this.unsubscribeState = null;
         });
@@ -71,13 +77,15 @@ export class GameScene extends Scene {
 
         if (Input.Keyboard.JustDown(this.cursors.attack)) {
             this.player.playLockedAction("attack", 320);
+            this.playSfxOnce(ASSET_KEYS.SFX_PLAYER_ATTACK, 0.35);
         }
 
         if (Input.Keyboard.JustDown(this.cursors.debugHit)) {
             this.player.playLockedAction("hit", 360);
+            this.playSfxOnce(ASSET_KEYS.SFX_PLAYER_HIT, 0.38);
         }
 
-        const onGround = this.player.body?.blocked.down || this.player.body?.touching.down;
+        const onGround = Boolean(this.player.body?.blocked.down || this.player.body?.touching.down);
         const jumpPressed =
             Input.Keyboard.JustDown(this.cursors.up) ||
             Input.Keyboard.JustDown(this.cursors.space) ||
@@ -85,6 +93,7 @@ export class GameScene extends Scene {
 
         if (onGround && jumpPressed) {
             this.player.jump(snapshot.evolutionLevel >= 1 ? 620 : 560);
+            this.playSfxOnce(ASSET_KEYS.SFX_PLAYER_JUMP, 0.4);
         }
 
         if (!this.player.isActionLocked()) {
@@ -96,6 +105,9 @@ export class GameScene extends Scene {
                 this.player.showRestFrame();
             }
         }
+
+        const isWalkingOnGround = onGround && Math.abs(this.player.body?.velocity.x ?? 0) > 2;
+        this.updateWalkSfx(isWalkingOnGround);
 
         if (Input.Keyboard.JustDown(this.cursors.debugCollect)) {
             gameState.addCellPoints(5);
@@ -144,6 +156,45 @@ export class GameScene extends Scene {
             debugHit: altKeys.H,
             debugCollect: altKeys.E
         };
+    }
+
+    private createCharacterSfx(): void {
+        if (this.cache.audio.exists(ASSET_KEYS.SFX_PLAYER_WALK)) {
+            this.walkSound = this.sound.add(ASSET_KEYS.SFX_PLAYER_WALK, {
+                volume: 0.25,
+                loop: true
+            });
+        }
+    }
+
+    private updateWalkSfx(shouldPlay: boolean): void {
+        if (!this.walkSound) {
+            return;
+        }
+
+        if (shouldPlay) {
+            if (!this.walkSound.isPlaying) {
+                this.walkSound.play();
+            }
+
+            return;
+        }
+
+        this.stopWalkSfx();
+    }
+
+    private stopWalkSfx(): void {
+        if (this.walkSound?.isPlaying) {
+            this.walkSound.stop();
+        }
+    }
+
+    private playSfxOnce(key: string, volume: number): void {
+        if (!this.cache.audio.exists(key)) {
+            return;
+        }
+
+        this.sound.play(key, { volume });
     }
 
     private createLevel(): void {
