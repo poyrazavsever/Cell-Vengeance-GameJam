@@ -1,5 +1,6 @@
 import { Physics, Scene } from "phaser";
 import { EnemyAnimationAction, getEnemyAnimationKey, getEnemyTextureKey } from "../../animations/enemyAnimations";
+import { ENEMY_SFX_KEYS, EnemySfxAction } from "../../constants/assetKeys";
 import { DamageSource, EnemyKind, EnemyState } from "../../types/combat";
 import { AttackHitboxConfig, EnemyConfig } from "../../types/enemy";
 import { Player } from "../player/Player";
@@ -100,6 +101,7 @@ export abstract class EnemyBase extends Physics.Arcade.Sprite {
 
         this.setBehaviorState("hit", time);
         this.playAnimation("hit");
+        this.playEnemySfx("hit", 0.35);
         this.setVelocityX(0);
         this.setTintFill(0xffffff);
         this.scene.time.delayedCall(90, () => {
@@ -201,6 +203,18 @@ export abstract class EnemyBase extends Physics.Arcade.Sprite {
         return Phaser.Math.Distance.Between(this.x, this.y, player.x, player.y) <= this.config.detectRange;
     }
 
+    protected playEnemySfx(action: EnemySfxAction, volume = 0.3): void {
+        const sfxMap = ENEMY_SFX_KEYS[this.kind];
+        if (!sfxMap) {
+            return;
+        }
+
+        const key = sfxMap[action];
+        if (key && this.scene.cache.audio.exists(key)) {
+            this.scene.sound.play(key, { volume });
+        }
+    }
+
     protected playAnimation(action: EnemyAnimationAction): void {
         const key = getEnemyAnimationKey(this.kind, action);
         if (this.scene.anims.exists(key)) {
@@ -245,6 +259,7 @@ export abstract class EnemyBase extends Physics.Arcade.Sprite {
         this.behaviorState = "death";
         this.stateStartedAt = time;
         this.playAnimation("death");
+        this.playEnemySfx("hit", 0.4);
         this.disableAttackHitbox();
         this.setVelocity(0, 0);
         (this.body as Physics.Arcade.Body).enable = false;

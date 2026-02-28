@@ -121,6 +121,7 @@ export class SpitterEnemy extends EnemyBase {
 
         if (nextState === "attack") {
             this.playAnimation("attack");
+            this.playEnemySfx("attack", 0.35);
             this.clearTint();
             this.setScale(this.baseScaleX, this.baseScaleY);
             return;
