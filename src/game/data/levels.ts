@@ -67,7 +67,11 @@ export const LEVELS: Record<1 | 2 | 3, LevelDefinition> = {
         platformPreset: level1Platforms,
         enemySpawns: [
             { kind: "scout", x: 620, y: 710, patrolMinX: 460, patrolMaxX: 820 },
-            { kind: "scout", x: 1420, y: 710, patrolMinX: 1260, patrolMaxX: 1600 }
+            { kind: "scout", x: 1420, y: 710, patrolMinX: 1260, patrolMaxX: 1600 },
+            { kind: "spitter", x: 2000, y: 560, patrolMinX: 1900, patrolMaxX: 2120 },
+            { kind: "scout", x: 2600, y: 710, patrolMinX: 2440, patrolMaxX: 2800 },
+            { kind: "spitter", x: 3200, y: 560, patrolMinX: 3100, patrolMaxX: 3340 },
+            { kind: "brute", x: 3900, y: 710, patrolMinX: 3720, patrolMaxX: 4100 }
         ]
     },
     2: {
@@ -78,10 +82,15 @@ export const LEVELS: Record<1 | 2 | 3, LevelDefinition> = {
         door: { x: 3280, y: 676 },
         platformPreset: level2Platforms,
         enemySpawns: [
+            { kind: "scout", x: 460, y: 710, patrolMinX: 340, patrolMaxX: 620 },
             { kind: "scout", x: 760, y: 710, patrolMinX: 620, patrolMaxX: 960 },
+            { kind: "spitter", x: 1100, y: 560, patrolMinX: 1000, patrolMaxX: 1200 },
+            { kind: "brute", x: 1420, y: 710, patrolMinX: 1260, patrolMaxX: 1580 },
             { kind: "spitter", x: 1560, y: 560, patrolMinX: 1480, patrolMaxX: 1660 },
+            { kind: "scout", x: 1900, y: 710, patrolMinX: 1760, patrolMaxX: 2060 },
             { kind: "scout", x: 2360, y: 710, patrolMinX: 2200, patrolMaxX: 2540 },
-            { kind: "spitter", x: 2820, y: 560, patrolMinX: 2740, patrolMaxX: 2960 }
+            { kind: "spitter", x: 2820, y: 560, patrolMinX: 2740, patrolMaxX: 2960 },
+            { kind: "brute", x: 3100, y: 710, patrolMinX: 2960, patrolMaxX: 3240 }
         ]
     },
     3: {
@@ -92,10 +101,16 @@ export const LEVELS: Record<1 | 2 | 3, LevelDefinition> = {
         door: { x: 4480, y: 676 },
         platformPreset: level3Platforms,
         enemySpawns: [
+            { kind: "scout", x: 500, y: 710, patrolMinX: 380, patrolMaxX: 660 },
             { kind: "scout", x: 760, y: 710, patrolMinX: 620, patrolMaxX: 940 },
+            { kind: "spitter", x: 1100, y: 560, patrolMinX: 1000, patrolMaxX: 1200 },
+            { kind: "brute", x: 1400, y: 710, patrolMinX: 1240, patrolMaxX: 1560 },
             { kind: "spitter", x: 1560, y: 560, patrolMinX: 1480, patrolMaxX: 1660 },
+            { kind: "scout", x: 1900, y: 710, patrolMinX: 1760, patrolMaxX: 2060 },
             { kind: "brute", x: 2300, y: 710, patrolMinX: 2140, patrolMaxX: 2480 },
+            { kind: "spitter", x: 2700, y: 560, patrolMinX: 2600, patrolMaxX: 2820 },
             { kind: "scout", x: 2960, y: 710, patrolMinX: 2820, patrolMaxX: 3140 },
+            { kind: "brute", x: 3300, y: 710, patrolMinX: 3140, patrolMaxX: 3460 },
             { kind: "spitter", x: 3440, y: 560, patrolMinX: 3360, patrolMaxX: 3560 },
             { kind: "brute", x: 4000, y: 710, patrolMinX: 3840, patrolMaxX: 4180 }
         ]

@@ -12,6 +12,7 @@ export class Player extends Physics.Arcade.Sprite {
     private currentAction: PlayerAnimationAction = "walk";
     private actionLocked = false;
     private lockTimer: Phaser.Time.TimerEvent | null = null;
+    private climbing = false;
 
     constructor(scene: Scene, x: number, y: number) {
         super(scene, x, y, PLAYER_EVOLUTION_TEXTURES[0]);
@@ -39,6 +40,33 @@ export class Player extends Physics.Arcade.Sprite {
 
     applyKnockback(horizontal: number, vertical: number): void {
         this.setVelocity(horizontal, vertical);
+    }
+
+    setClimbing(value: boolean): void {
+        if (this.climbing === value) {
+            return;
+        }
+
+        this.climbing = value;
+        const body = this.body as Physics.Arcade.Body | null;
+        if (!body) {
+            return;
+        }
+
+        if (value) {
+            body.setAllowGravity(false);
+            this.setVelocity(0, 0);
+        } else {
+            body.setAllowGravity(true);
+        }
+    }
+
+    isClimbing(): boolean {
+        return this.climbing;
+    }
+
+    climbVertical(direction: number, speed: number): void {
+        this.setVelocityY(direction * speed);
     }
 
     respawnAt(x: number, y: number): void {
