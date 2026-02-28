@@ -32,6 +32,7 @@ export class PreloadScene extends Scene {
         this.load.image(ASSET_KEYS.LOGO, "assets/logo.png");
         this.load.image(ASSET_KEYS.MENU_BG, "bg.png");
         this.load.image(ASSET_KEYS.TEXT_LOGO, "textLogo.png");
+        this.load.video(ASSET_KEYS.INTRO_VIDEO, { url: "start.mp4", type: "mp4" }, false);
         this.load.spritesheet(ASSET_KEYS.PLAYER_LEVEL_1, "assets/characters/1.png", { frameWidth: PLAYER_FRAME_SIZE, frameHeight: PLAYER_FRAME_SIZE });
         this.load.spritesheet(ASSET_KEYS.PLAYER_LEVEL_2, "assets/characters/2.png", { frameWidth: PLAYER_FRAME_SIZE, frameHeight: PLAYER_FRAME_SIZE });
         this.load.spritesheet(ASSET_KEYS.PLAYER_LEVEL_3, "assets/characters/3.png", { frameWidth: PLAYER_FRAME_SIZE, frameHeight: PLAYER_FRAME_SIZE });
@@ -48,7 +49,7 @@ export class PreloadScene extends Scene {
     }
 
     create(): void {
-        this.scene.start(SCENE_KEYS.MAIN_MENU);
+        this.scene.start(SCENE_KEYS.INTRO);
     }
 
     private drawLoadingBar(progress: number): void {

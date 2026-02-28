@@ -2,6 +2,7 @@ export const ASSET_KEYS = {
     LOGO: "logo",
     MENU_BG: "menu-bg",
     TEXT_LOGO: "text-logo",
+    INTRO_VIDEO: "intro-video",
     PLAYER_LEVEL_1: "player-level-1",
     PLAYER_LEVEL_2: "player-level-2",
     PLAYER_LEVEL_3: "player-level-3",

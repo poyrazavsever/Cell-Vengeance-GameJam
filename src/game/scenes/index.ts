@@ -1,5 +1,6 @@
 export { BootScene } from "./BootScene";
 export { PreloadScene } from "./PreloadScene";
+export { IntroScene } from "./IntroScene";
 export { MainMenuScene } from "./MainMenuScene";
 export { LevelSelectScene } from "./LevelSelectScene";
 export { SettingsScene } from "./SettingsScene";

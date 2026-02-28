@@ -3,6 +3,7 @@ import {
     BootScene,
     GameScene,
     HudScene,
+    IntroScene,
     LevelCompleteScene,
     LevelSelectScene,
     MainMenuScene,
@@ -29,5 +30,5 @@ export const gameConfig: Types.Core.GameConfig = {
             debug: false
         }
     },
-    scene: [BootScene, PreloadScene, MainMenuScene, LevelSelectScene, SettingsScene, GameScene, HudScene, LevelCompleteScene]
+    scene: [BootScene, PreloadScene, IntroScene, MainMenuScene, LevelSelectScene, SettingsScene, GameScene, HudScene, LevelCompleteScene]
 };

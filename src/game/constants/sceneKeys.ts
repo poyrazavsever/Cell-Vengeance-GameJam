@@ -1,6 +1,7 @@
 export const SCENE_KEYS = {
     BOOT: "BootScene",
     PRELOAD: "PreloadScene",
+    INTRO: "IntroScene",
     MAIN_MENU: "MainMenuScene",
     LEVEL_SELECT: "LevelSelectScene",
     SETTINGS: "SettingsScene",
