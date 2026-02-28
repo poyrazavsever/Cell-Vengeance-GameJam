@@ -95,6 +95,7 @@ export class BruteEnemy extends EnemyBase {
 
         if (nextState === "attack") {
             this.playAnimation("attack");
+            this.playEnemySfx("attack", 0.4);
             this.clearTint();
             return;
         }
