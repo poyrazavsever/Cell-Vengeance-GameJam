@@ -16,8 +16,43 @@ export const ASSET_KEYS = {
     SFX_PLAYER_WALK: "sfx-player-walk",
     SFX_PLAYER_JUMP: "sfx-player-jump",
     SFX_PLAYER_ATTACK: "sfx-player-attack",
-    SFX_PLAYER_HIT: "sfx-player-hit"
+    SFX_PLAYER_HIT: "sfx-player-hit",
+    SFX_SCOUT_WALK: "sfx-scout-walk",
+    SFX_SCOUT_JUMP: "sfx-scout-jump",
+    SFX_SCOUT_ATTACK: "sfx-scout-attack",
+    SFX_SCOUT_HIT: "sfx-scout-hit",
+    SFX_SPITTER_WALK: "sfx-spitter-walk",
+    SFX_SPITTER_JUMP: "sfx-spitter-jump",
+    SFX_SPITTER_ATTACK: "sfx-spitter-attack",
+    SFX_SPITTER_HIT: "sfx-spitter-hit",
+    SFX_BRUTE_WALK: "sfx-brute-walk",
+    SFX_BRUTE_JUMP: "sfx-brute-jump",
+    SFX_BRUTE_ATTACK: "sfx-brute-attack",
+    SFX_BRUTE_HIT: "sfx-brute-hit"
 } as const;
+
+export type EnemySfxAction = "walk" | "jump" | "attack" | "hit";
+
+export const ENEMY_SFX_KEYS: Record<string, Record<EnemySfxAction, string>> = {
+    scout: {
+        walk: ASSET_KEYS.SFX_SCOUT_WALK,
+        jump: ASSET_KEYS.SFX_SCOUT_JUMP,
+        attack: ASSET_KEYS.SFX_SCOUT_ATTACK,
+        hit: ASSET_KEYS.SFX_SCOUT_HIT
+    },
+    spitter: {
+        walk: ASSET_KEYS.SFX_SPITTER_WALK,
+        jump: ASSET_KEYS.SFX_SPITTER_JUMP,
+        attack: ASSET_KEYS.SFX_SPITTER_ATTACK,
+        hit: ASSET_KEYS.SFX_SPITTER_HIT
+    },
+    brute: {
+        walk: ASSET_KEYS.SFX_BRUTE_WALK,
+        jump: ASSET_KEYS.SFX_BRUTE_JUMP,
+        attack: ASSET_KEYS.SFX_BRUTE_ATTACK,
+        hit: ASSET_KEYS.SFX_BRUTE_HIT
+    }
+};
 
 export const PLAYER_EVOLUTION_TEXTURES = [
     ASSET_KEYS.PLAYER_LEVEL_1,

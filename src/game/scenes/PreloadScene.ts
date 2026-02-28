@@ -73,6 +73,18 @@ export class PreloadScene extends Scene {
         this.load.audio(ASSET_KEYS.SFX_PLAYER_JUMP, "sound/mainCharacter/jump.mp3");
         this.load.audio(ASSET_KEYS.SFX_PLAYER_ATTACK, "sound/mainCharacter/attack.mp3");
         this.load.audio(ASSET_KEYS.SFX_PLAYER_HIT, "sound/mainCharacter/hit.mp3");
+        this.load.audio(ASSET_KEYS.SFX_SCOUT_WALK, "sound/scout/walking.mp3");
+        this.load.audio(ASSET_KEYS.SFX_SCOUT_JUMP, "sound/scout/jump.mp3");
+        this.load.audio(ASSET_KEYS.SFX_SCOUT_ATTACK, "sound/scout/attack.mp3");
+        this.load.audio(ASSET_KEYS.SFX_SCOUT_HIT, "sound/scout/hit.mp3");
+        this.load.audio(ASSET_KEYS.SFX_SPITTER_WALK, "sound/spitter/walking.mp3");
+        this.load.audio(ASSET_KEYS.SFX_SPITTER_JUMP, "sound/spitter/jump.mp3");
+        this.load.audio(ASSET_KEYS.SFX_SPITTER_ATTACK, "sound/spitter/attack.mp3");
+        this.load.audio(ASSET_KEYS.SFX_SPITTER_HIT, "sound/spitter/hit.mp3");
+        this.load.audio(ASSET_KEYS.SFX_BRUTE_WALK, "sound/brute/walking.mp3");
+        this.load.audio(ASSET_KEYS.SFX_BRUTE_JUMP, "sound/brute/jump.mp3");
+        this.load.audio(ASSET_KEYS.SFX_BRUTE_ATTACK, "sound/brute/attack.mp3");
+        this.load.audio(ASSET_KEYS.SFX_BRUTE_HIT, "sound/brute/hit.mp3");
     }
 
     create(): void {
