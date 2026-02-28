@@ -78,7 +78,7 @@ export const LEVELS: Record<1 | 2 | 3, LevelDefinition> = {
         id: 2,
         name: "Bölüm 2 - Gelişim Koridoru",
         worldWidth: 3400,
-        spawn: { x: 140, y: 620 },
+        spawn: { x: 140, y: 364 },
         door: { x: 3280, y: 676 },
         platformPreset: level2Platforms,
         enemySpawns: [
@@ -97,7 +97,7 @@ export const LEVELS: Record<1 | 2 | 3, LevelDefinition> = {
         id: 3,
         name: "Bölüm 3 - Final Laboratuvarı",
         worldWidth: 4600,
-        spawn: { x: 140, y: 620 },
+        spawn: { x: 140, y: 364 },
         door: { x: 4480, y: 676 },
         platformPreset: level3Platforms,
         enemySpawns: [

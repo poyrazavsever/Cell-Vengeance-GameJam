@@ -23,11 +23,13 @@ interface MapTileLookupEntry {
     height: number;
 }
 
-const MAP1_TSX_KEYS: Record<string, string> = {
+const TSX_CACHE_KEYS: Record<string, string> = {
     "background.tsx": "map1-tsx-background",
     "tiles.tsx": "map1-tsx-tiles",
     "objects.tsx": "map1-tsx-objects"
 };
+
+const MAP_ASSET_KEYS = [ASSET_KEYS.MAP_LEVEL_1, ASSET_KEYS.MAP_LEVEL_2, ASSET_KEYS.MAP_LEVEL_3] as const;
 
 export class PreloadScene extends Scene {
     private loadingBar!: Phaser.GameObjects.Graphics;
@@ -57,9 +59,11 @@ export class PreloadScene extends Scene {
         this.load.image(ASSET_KEYS.TEXT_LOGO, "textLogo.png");
         this.load.video(ASSET_KEYS.INTRO_VIDEO, { url: "start.mp4", type: "mp4" }, false);
         this.load.tilemapTiledJSON(ASSET_KEYS.MAP_LEVEL_1, "maps/map1.json");
-        this.load.text(MAP1_TSX_KEYS["background.tsx"], "maps/background.tsx");
-        this.load.text(MAP1_TSX_KEYS["tiles.tsx"], "maps/tiles.tsx");
-        this.load.text(MAP1_TSX_KEYS["objects.tsx"], "maps/objects.tsx");
+        this.load.tilemapTiledJSON(ASSET_KEYS.MAP_LEVEL_2, "maps/map2.json");
+        this.load.tilemapTiledJSON(ASSET_KEYS.MAP_LEVEL_3, "maps/map3.json");
+        this.load.text(TSX_CACHE_KEYS["background.tsx"], "maps/background.tsx");
+        this.load.text(TSX_CACHE_KEYS["tiles.tsx"], "maps/tiles.tsx");
+        this.load.text(TSX_CACHE_KEYS["objects.tsx"], "maps/objects.tsx");
         this.load.spritesheet(ASSET_KEYS.PLAYER_LEVEL_1, "assets/characters/1.png", { frameWidth: PLAYER_FRAME_SIZE, frameHeight: PLAYER_FRAME_SIZE });
         this.load.spritesheet(ASSET_KEYS.PLAYER_LEVEL_2, "assets/characters/2.png", { frameWidth: PLAYER_FRAME_SIZE, frameHeight: PLAYER_FRAME_SIZE });
         this.load.spritesheet(ASSET_KEYS.PLAYER_LEVEL_3, "assets/characters/3.png", { frameWidth: PLAYER_FRAME_SIZE, frameHeight: PLAYER_FRAME_SIZE });
@@ -88,7 +92,10 @@ export class PreloadScene extends Scene {
     }
 
     create(): void {
-        const additionalFiles = this.prepareLevel1TilesetImages();
+        const additionalFiles = MAP_ASSET_KEYS.reduce((count, mapAssetKey) => {
+            return count + this.prepareMapTilesetImages(mapAssetKey);
+        }, 0);
+
         if (additionalFiles > 0) {
             this.drawLoadingBar(0);
             this.load.once("complete", () => {
@@ -116,11 +123,11 @@ export class PreloadScene extends Scene {
         this.loadingBar.fillRoundedRect(x + 4, y + 4, (width - 8) * progress, height - 8, 6);
     }
 
-    private prepareLevel1TilesetImages(): number {
-        const mapRaw = this.cache.tilemap.get(ASSET_KEYS.MAP_LEVEL_1);
+    private prepareMapTilesetImages(mapAssetKey: string): number {
+        const mapRaw = this.cache.tilemap.get(mapAssetKey);
         const mapData = mapRaw?.data as TiledMapData | undefined;
         if (!mapData || !Array.isArray(mapData.layers) || !Array.isArray(mapData.tilesets)) {
-            this.registry.set("map1TileLookup", {});
+            this.registry.set(this.getMapLookupRegistryKey(mapAssetKey), {});
             return 0;
         }
 
@@ -130,7 +137,7 @@ export class PreloadScene extends Scene {
 
         mapData.tilesets.forEach((tileset) => {
             const sourceName = tileset.source.split("/").pop() ?? tileset.source;
-            const tsxCacheKey = MAP1_TSX_KEYS[sourceName];
+            const tsxCacheKey = TSX_CACHE_KEYS[sourceName];
             if (!tsxCacheKey || !this.cache.text.exists(tsxCacheKey)) {
                 return;
             }
@@ -152,7 +159,7 @@ export class PreloadScene extends Scene {
                     continue;
                 }
 
-                const textureKey = `map1-gid-${gid}`;
+                const textureKey = `${mapAssetKey}-gid-${gid}`;
                 if (!this.textures.exists(textureKey)) {
                     this.load.image(textureKey, encodeURI(imagePath));
                     queuedFiles += 1;
@@ -168,8 +175,12 @@ export class PreloadScene extends Scene {
             }
         });
 
-        this.registry.set("map1TileLookup", lookup);
+        this.registry.set(this.getMapLookupRegistryKey(mapAssetKey), lookup);
         return queuedFiles;
+    }
+
+    private getMapLookupRegistryKey(mapAssetKey: string): string {
+        return `mapTileLookup:${mapAssetKey}`;
     }
 
     private collectUsedGids(mapData: TiledMapData): Set<number> {

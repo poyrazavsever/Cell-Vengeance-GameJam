@@ -58,6 +58,7 @@ type MapTileLookup = Record<string, MapTileLookupEntry>;
 
 const PLAYER_ATTACK_DURATION_MS = 140;
 const WORLD_HEIGHT = 800;
+const CAMERA_ZOOM = 1.45;
 const MAP_LAYER_NAMES = {
     background: ["Arkaplan"],
     upper: ["Üst katman"],
@@ -83,6 +84,7 @@ export class GameScene extends Scene {
     private levelDoor!: LevelDoor;
     private doorHintText!: Phaser.GameObjects.Text;
     private isCompletingLevel = false;
+    private currentMapAssetKey: string | null = null;
     private mapCollisionLayer: TiledLayerData | null = null;
     private mapCollisionTileWidth = 32;
     private mapCollisionTileHeight = 32;
@@ -103,6 +105,7 @@ export class GameScene extends Scene {
         const requestedLevel = data.levelId ?? snapshot.profile.selectedLevel;
         const levelId = gameState.canPlayLevel(requestedLevel) ? requestedLevel : snapshot.profile.unlockedLevel;
         this.level = getLevelById(levelId);
+        this.currentMapAssetKey = this.resolveMapAssetKey(levelId);
     }
 
     create(): void {
@@ -159,8 +162,8 @@ export class GameScene extends Scene {
     }
 
     update(time: number, delta: number): void {
-        this.updateDoorInteraction();
         this.handlePlayerInput();
+        this.updateDoorInteraction();
         this.enemyManager.update(this.player, time, delta);
         this.updatePlayerAttackHitboxPosition();
         this.updateWalkSound();
@@ -258,12 +261,10 @@ export class GameScene extends Scene {
         this.mapCollisionLayer = null;
         this.playerOnLadder = false;
 
-        if (this.level.id === 1) {
-            const mapData = this.getLevel1MapData();
-            if (mapData) {
-                this.createLevelFromMapData(mapData);
-                return;
-            }
+        const mapData = this.getCurrentLevelMapData();
+        if (mapData) {
+            this.createLevelFromMapData(mapData);
+            return;
         }
 
         this.level.platformPreset.forEach((platform) => {
@@ -271,8 +272,12 @@ export class GameScene extends Scene {
         });
     }
 
-    private getLevel1MapData(): TiledMapData | null {
-        const raw = this.cache.tilemap.get(ASSET_KEYS.MAP_LEVEL_1);
+    private getCurrentLevelMapData(): TiledMapData | null {
+        if (!this.currentMapAssetKey) {
+            return null;
+        }
+
+        const raw = this.cache.tilemap.get(this.currentMapAssetKey);
         const mapData = raw?.data as TiledMapData | undefined;
         if (!mapData || !Array.isArray(mapData.layers)) {
             return null;
@@ -286,9 +291,7 @@ export class GameScene extends Scene {
         const worldHeight = mapData.height * mapData.tileheight;
         const tileLookup = this.getMapTileLookup();
         this.level.worldWidth = worldWidth;
-        if (this.level.door.x > worldWidth - 40 || this.level.door.x < worldWidth * 0.4) {
-            this.level.door.x = Math.max(mapData.tilewidth * 2, worldWidth - mapData.tilewidth * 4);
-        }
+        this.level.door.x = Math.max(mapData.tilewidth * 2, worldWidth - mapData.tilewidth * 4);
 
         // Place door 8 tiles above the ground (bottom of map)
         const doorY = worldHeight - (8 * mapData.tileheight) - 59;
@@ -320,8 +323,25 @@ export class GameScene extends Scene {
     }
 
     private getMapTileLookup(): MapTileLookup {
-        const lookup = this.registry.get("map1TileLookup") as MapTileLookup | undefined;
+        if (!this.currentMapAssetKey) {
+            return {};
+        }
+
+        const lookup = this.registry.get(`mapTileLookup:${this.currentMapAssetKey}`) as MapTileLookup | undefined;
         return lookup ?? {};
+    }
+
+    private resolveMapAssetKey(levelId: LevelId): string | null {
+        switch (levelId) {
+            case 1:
+                return ASSET_KEYS.MAP_LEVEL_1;
+            case 2:
+                return ASSET_KEYS.MAP_LEVEL_2;
+            case 3:
+                return ASSET_KEYS.MAP_LEVEL_3;
+            default:
+                return null;
+        }
     }
 
     private drawMapLayer(
@@ -879,7 +899,9 @@ export class GameScene extends Scene {
         const canEnter = this.levelDoor.isPlayerInside(playerBounds);
         this.doorHintText.setVisible(canEnter);
 
-        if (canEnter && Input.Keyboard.JustDown(this.confirmKey)) {
+        // Allow both tap and hold so door entry is not frame-timing dependent.
+        const requestedEnter = Input.Keyboard.JustDown(this.confirmKey) || this.confirmKey.isDown;
+        if (canEnter && requestedEnter) {
             this.completeCurrentLevel();
         }
     }
@@ -994,6 +1016,7 @@ export class GameScene extends Scene {
     }
 
     private configureCamera(): void {
+        this.cameras.main.setZoom(CAMERA_ZOOM);
         this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
         this.cameras.main.setDeadzone(360, 320);
         this.cameras.main.setFollowOffset(-180, 0);

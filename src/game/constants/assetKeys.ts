@@ -4,6 +4,8 @@ export const ASSET_KEYS = {
     TEXT_LOGO: "text-logo",
     INTRO_VIDEO: "intro-video",
     MAP_LEVEL_1: "map-level-1",
+    MAP_LEVEL_2: "map-level-2",
+    MAP_LEVEL_3: "map-level-3",
     PLAYER_LEVEL_1: "player-level-1",
     PLAYER_LEVEL_2: "player-level-2",
     PLAYER_LEVEL_3: "player-level-3",
