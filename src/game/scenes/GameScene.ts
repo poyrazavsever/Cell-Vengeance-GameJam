@@ -91,6 +91,8 @@ export class GameScene extends Scene {
     private previousEvolution = 0;
     private walkSound: Phaser.Sound.BaseSound | null = null;
     private confirmKey!: Phaser.Input.Keyboard.Key;
+    private ladderZones!: Phaser.Physics.Arcade.StaticGroup;
+    private playerOnLadder = false;
 
     constructor() {
         super(SCENE_KEYS.GAME);
@@ -176,6 +178,46 @@ export class GameScene extends Scene {
             direction = 1;
         }
 
+        // --- Ladder climbing ---
+        const onLadder = this.isPlayerOnLadder();
+        const wantsClimbUp = this.cursors.up.isDown || this.cursors.jumpAlt.isDown;
+        const wantsClimbDown = this.cursors.down.isDown;
+
+        if (onLadder && (wantsClimbUp || wantsClimbDown)) {
+            if (!this.playerOnLadder) {
+                this.playerOnLadder = true;
+                this.player.setClimbing(true);
+            }
+
+            const climbSpeed = 160;
+            if (wantsClimbUp) {
+                this.player.climbVertical(-1, climbSpeed);
+            } else {
+                this.player.climbVertical(1, climbSpeed);
+            }
+            this.player.moveHorizontal(direction, stats.moveBase * 0.3);
+            this.player.playAction("climb");
+            return;
+        }
+
+        if (this.playerOnLadder && !onLadder) {
+            this.playerOnLadder = false;
+            this.player.setClimbing(false);
+        }
+
+        if (this.playerOnLadder && onLadder && !wantsClimbUp && !wantsClimbDown) {
+            // Player is on ladder but not pressing up/down — hold position
+            this.player.climbVertical(0, 0);
+            this.player.moveHorizontal(direction, stats.moveBase * 0.3);
+            if (direction !== 0) {
+                this.player.playAction("climb");
+            } else {
+                this.player.showRestFrame();
+            }
+            return;
+        }
+
+        // --- Normal movement ---
         const canDash = stats.evolutionLevel >= 2;
         const dashBonus = canDash && this.cursors.dash.isDown && direction !== 0 ? stats.dashBonus : 0;
         this.player.moveHorizontal(direction, stats.moveBase + dashBonus);
@@ -212,7 +254,9 @@ export class GameScene extends Scene {
 
     private createLevel(): void {
         this.platforms = this.physics.add.staticGroup();
+        this.ladderZones = this.physics.add.staticGroup();
         this.mapCollisionLayer = null;
+        this.playerOnLadder = false;
 
         if (this.level.id === 1) {
             const mapData = this.getLevel1MapData();
@@ -264,6 +308,11 @@ export class GameScene extends Scene {
         this.mapCollisionTileWidth = mapData.tilewidth;
         this.mapCollisionTileHeight = mapData.tileheight;
         this.createCollisionFromLayer(collisionLayer, mapData.tilewidth, mapData.tileheight);
+
+        const ladderLayer = this.getFirstMapLayerByNames(mapData, MAP_LAYER_NAMES.ladder);
+        if (ladderLayer?.data) {
+            this.createLadderZonesFromLayer(ladderLayer, mapData.tilewidth, mapData.tileheight);
+        }
     }
 
     private getMapTileLookup(): MapTileLookup {
@@ -416,6 +465,71 @@ export class GameScene extends Scene {
                 }
             }
         }
+    }
+
+    private createLadderZonesFromLayer(layer: TiledLayerData, tileWidth: number, tileHeight: number): void {
+        if (!layer.data) {
+            return;
+        }
+
+        // Scan columns to create vertically merged ladder zones
+        for (let x = 0; x < layer.width; x += 1) {
+            let runStartY = -1;
+            for (let y = 0; y <= layer.height; y += 1) {
+                const index = y < layer.height ? layer.data[y * layer.width + x] : 0;
+                const hasTile = index > 0;
+
+                if (hasTile && runStartY === -1) {
+                    runStartY = y;
+                    continue;
+                }
+
+                if (!hasTile && runStartY !== -1) {
+                    const runHeight = y - runStartY;
+                    const pixelHeight = runHeight * tileHeight;
+                    const centerX = x * tileWidth + tileWidth * 0.5;
+                    const centerY = runStartY * tileHeight + pixelHeight * 0.5;
+
+                    const zone = this.add.zone(centerX, centerY, tileWidth, pixelHeight);
+                    this.physics.add.existing(zone, true);
+                    (zone.body as Physics.Arcade.StaticBody).setSize(tileWidth, pixelHeight);
+                    this.ladderZones.add(zone);
+                    runStartY = -1;
+                }
+            }
+        }
+    }
+
+    private isPlayerOnLadder(): boolean {
+        const playerBody = this.player.body as Physics.Arcade.Body | null;
+        if (!playerBody) {
+            return false;
+        }
+
+        const px = playerBody.x;
+        const py = playerBody.y;
+        const pw = playerBody.width;
+        const ph = playerBody.height;
+
+        const children = this.ladderZones.getChildren();
+        for (let i = 0; i < children.length; i += 1) {
+            const zone = children[i] as Phaser.GameObjects.Zone;
+            const zoneBody = zone.body as Physics.Arcade.StaticBody;
+            if (!zoneBody) {
+                continue;
+            }
+
+            const zx = zoneBody.x;
+            const zy = zoneBody.y;
+            const zw = zoneBody.width;
+            const zh = zoneBody.height;
+
+            if (px < zx + zw && px + pw > zx && py < zy + zh && py + ph > zy) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private createPlayer(): void {

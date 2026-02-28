@@ -1,13 +1,14 @@
 import { Scene } from "phaser";
 import { PLAYER_EVOLUTION_TEXTURES } from "../constants/assetKeys";
 
-export type PlayerAnimationAction = "walk" | "jump" | "attack" | "hit";
+export type PlayerAnimationAction = "walk" | "jump" | "attack" | "hit" | "climb";
 
 const ACTION_FRAME_RANGES: Record<PlayerAnimationAction, { start: number; end: number; frameRate: number; repeat: number }> = {
     walk: { start: 0, end: 3, frameRate: 10, repeat: -1 },
     jump: { start: 4, end: 7, frameRate: 10, repeat: -1 },
     attack: { start: 8, end: 11, frameRate: 14, repeat: 0 },
-    hit: { start: 12, end: 15, frameRate: 12, repeat: 0 }
+    hit: { start: 12, end: 15, frameRate: 12, repeat: 0 },
+    climb: { start: 4, end: 7, frameRate: 6, repeat: -1 }
 };
 
 export const getPlayerAnimationKey = (textureKey: string, action: PlayerAnimationAction): string => {
