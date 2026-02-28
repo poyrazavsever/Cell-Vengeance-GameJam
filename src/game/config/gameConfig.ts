@@ -1,4 +1,4 @@
-import { AUTO, Types } from "phaser";
+import { AUTO, Scale, Types } from "phaser";
 import {
     BootScene,
     GameScene,
@@ -14,6 +14,12 @@ export const gameConfig: Types.Core.GameConfig = {
     type: AUTO,
     width: 1024,
     height: 768,
+    scale: {
+        mode: Scale.FIT,
+        autoCenter: Scale.CENTER_BOTH,
+        width: 1024,
+        height: 768
+    },
     parent: "game-container",
     backgroundColor: "#08131b",
     physics: {

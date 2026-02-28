@@ -15,8 +15,6 @@ export const ensureMenuMusic = (scene: Scene): void => {
 
     const existingMusic = getMenuMusic(scene);
     if (existingMusic) {
-        existingMusic.setLoop(true);
-        existingMusic.setVolume(MENU_MUSIC_VOLUME);
         if (!existingMusic.isPlaying) {
             existingMusic.play();
         }

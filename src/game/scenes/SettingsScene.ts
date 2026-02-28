@@ -106,8 +106,17 @@ export class SettingsScene extends Scene {
                     this.scale.stopFullscreen();
                 } else {
                     this.scale.startFullscreen();
+                    this.time.delayedCall(0, () => {
+                        if (this.scale.isFullscreen) {
+                            return;
+                        }
+
+                        const fullscreenTarget = this.game.canvas?.parentElement ?? this.game.canvas;
+                        void fullscreenTarget?.requestFullscreen?.();
+                    });
                 }
 
+                this.scale.refresh();
                 this.refreshUi();
             }
         });
@@ -124,6 +133,13 @@ export class SettingsScene extends Scene {
 
         this.input.keyboard?.on("keydown-ESC", () => {
             this.scene.start(SCENE_KEYS.MAIN_MENU);
+        });
+
+        this.scale.on(Phaser.Scale.Events.ENTER_FULLSCREEN, this.refreshUi, this);
+        this.scale.on(Phaser.Scale.Events.LEAVE_FULLSCREEN, this.refreshUi, this);
+        this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+            this.scale.off(Phaser.Scale.Events.ENTER_FULLSCREEN, this.refreshUi, this);
+            this.scale.off(Phaser.Scale.Events.LEAVE_FULLSCREEN, this.refreshUi, this);
         });
 
         this.refreshUi();
