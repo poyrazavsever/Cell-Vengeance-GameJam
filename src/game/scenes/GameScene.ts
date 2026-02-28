@@ -290,6 +290,10 @@ export class GameScene extends Scene {
             this.level.door.x = Math.max(mapData.tilewidth * 2, worldWidth - mapData.tilewidth * 4);
         }
 
+        // Place door 8 tiles above the ground (bottom of map)
+        const doorY = worldHeight - (8 * mapData.tileheight) - 59;
+        this.level.door.y = doorY;
+
         this.physics.world.setBounds(0, 0, worldWidth, worldHeight);
         this.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
 
