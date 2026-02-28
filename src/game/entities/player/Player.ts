@@ -3,6 +3,9 @@ import { PLAYER_EVOLUTION_TEXTURES } from "../../constants/assetKeys";
 import { getPlayerAnimationKey, PlayerAnimationAction } from "../../animations/playerAnimations";
 
 const BASE_SCALE = 0.32;
+const BODY_WIDTH_RATIO = 0.56;
+const BODY_HEIGHT_RATIO = 0.62;
+const BODY_BOTTOM_TRIM_RATIO = 0.08;
 
 export class Player extends Physics.Arcade.Sprite {
     private evolutionLevel = 0;
@@ -88,10 +91,27 @@ export class Player extends Physics.Arcade.Sprite {
     private refreshVisual(): void {
         const scale = BASE_SCALE + this.evolutionLevel * 0.015;
         this.setScale(scale);
-        this.body?.setSize(210, 290, true);
+        this.refreshBodySize();
     }
 
     private getCurrentTextureKey(): string {
         return PLAYER_EVOLUTION_TEXTURES[this.evolutionLevel];
+    }
+
+    private refreshBodySize(): void {
+        const body = this.body as Physics.Arcade.Body | null;
+        if (!body) {
+            return;
+        }
+
+        const frameWidth = this.frame.realWidth;
+        const frameHeight = this.frame.realHeight;
+        const bodyWidth = frameWidth * BODY_WIDTH_RATIO;
+        const bodyHeight = frameHeight * BODY_HEIGHT_RATIO;
+        const offsetX = (frameWidth - bodyWidth) * 0.5;
+        const offsetY = frameHeight - bodyHeight - frameHeight * BODY_BOTTOM_TRIM_RATIO;
+
+        body.setSize(bodyWidth, bodyHeight);
+        body.setOffset(offsetX, offsetY);
     }
 }

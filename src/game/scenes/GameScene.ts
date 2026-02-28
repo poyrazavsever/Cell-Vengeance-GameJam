@@ -40,11 +40,11 @@ export class GameScene extends Scene {
         this.createPickups();
         this.bindProgressState();
 
-        this.add.text(20, 20, "J: Attack | H: Hit | E: +5 Cell Point", {
+        this.add.text(20, 112, "J: Attack | H: Hit | E: +5 Cell Point", {
             color: "#d7f6ff",
             fontFamily: "Verdana",
             fontSize: "18px"
-        });
+        }).setDepth(10);
 
         EventBus.emit(EVENT_KEYS.CURRENT_SCENE_READY, this);
 
@@ -84,7 +84,7 @@ export class GameScene extends Scene {
             Input.Keyboard.JustDown(this.cursors.jumpAlt);
 
         if (onGround && jumpPressed) {
-            this.player.jump(snapshot.evolutionLevel >= 1 ? 420 : 390);
+            this.player.jump(snapshot.evolutionLevel >= 1 ? 620 : 560);
         }
 
         if (!this.player.isActionLocked()) {
