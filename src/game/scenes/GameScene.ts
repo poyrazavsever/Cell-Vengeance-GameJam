@@ -36,6 +36,7 @@ interface TiledLayerData {
     name: string;
     width: number;
     height: number;
+    visible?: boolean;
     data?: number[];
 }
 
@@ -57,6 +58,13 @@ type MapTileLookup = Record<string, MapTileLookupEntry>;
 
 const PLAYER_ATTACK_DURATION_MS = 140;
 const WORLD_HEIGHT = 800;
+const MAP_LAYER_NAMES = {
+    background: ["Arkaplan"],
+    upper: ["Üst katman"],
+    upperPlus: ["Üst+ katman"],
+    solid: ["Ana katman", "Tile Layer 3"],
+    ladder: ["Merdiven"]
+} as const;
 
 export class GameScene extends Scene {
     private cursors!: MovementKeys;
@@ -241,12 +249,13 @@ export class GameScene extends Scene {
         this.physics.world.setBounds(0, 0, worldWidth, worldHeight);
         this.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
 
-        this.drawMapLayer(mapData, "Arkaplan", tileLookup, -40, 0x143b55, 0.28);
-        this.drawMapLayer(mapData, "Üst katman", tileLookup, -30, 0x2a6288, 0.36);
-        this.drawMapLayer(mapData, "Üst+ katman", tileLookup, -20, 0x4b88a5, 0.44);
-        this.drawMapLayer(mapData, "Tile Layer 3", tileLookup, -8, 0x2d5f7b, 0.7);
+        this.drawMapLayer(mapData, MAP_LAYER_NAMES.background, tileLookup, -40, 0x143b55, 0.28);
+        this.drawMapLayer(mapData, MAP_LAYER_NAMES.upper, tileLookup, -30, 0x2a6288, 0.36);
+        this.drawMapLayer(mapData, MAP_LAYER_NAMES.upperPlus, tileLookup, -20, 0x4b88a5, 0.44);
+        this.drawMapLayer(mapData, MAP_LAYER_NAMES.solid, tileLookup, -8, 0x2d5f7b, 0.7);
+        this.drawMapLayer(mapData, MAP_LAYER_NAMES.ladder, tileLookup, 8, 0x8bd3ff, 0.6);
 
-        const collisionLayer = mapData.layers.find((layer) => layer.type === "tilelayer" && layer.name === "Tile Layer 3");
+        const collisionLayer = this.getFirstMapLayerByNames(mapData, MAP_LAYER_NAMES.solid);
         if (!collisionLayer || !collisionLayer.data) {
             return;
         }
@@ -264,28 +273,32 @@ export class GameScene extends Scene {
 
     private drawMapLayer(
         mapData: TiledMapData,
-        layerName: string,
+        layerNames: readonly string[],
         tileLookup: MapTileLookup,
         depth: number,
         fallbackColor: number,
         fallbackAlpha: number
     ): void {
-        const drawnWithTextures = this.drawMapLayerTiles(mapData, layerName, tileLookup, depth);
+        const layer = this.getFirstMapLayerByNames(mapData, layerNames);
+        if (!layer) {
+            return;
+        }
+
+        const drawnWithTextures = this.drawMapLayerTiles(mapData, layer, tileLookup, depth);
         if (drawnWithTextures) {
             return;
         }
 
-        this.drawMapLayerRuns(mapData, layerName, fallbackColor, fallbackAlpha, depth);
+        this.drawMapLayerRuns(mapData, layer, fallbackColor, fallbackAlpha, depth);
     }
 
     private drawMapLayerTiles(
         mapData: TiledMapData,
-        layerName: string,
+        layer: TiledLayerData,
         tileLookup: MapTileLookup,
         depth: number
     ): boolean {
-        const layer = mapData.layers.find((candidate) => candidate.type === "tilelayer" && candidate.name === layerName);
-        if (!layer || !layer.data) {
+        if (!layer.data) {
             return false;
         }
 
@@ -326,13 +339,12 @@ export class GameScene extends Scene {
 
     private drawMapLayerRuns(
         mapData: TiledMapData,
-        layerName: string,
+        layer: TiledLayerData,
         color: number,
         alpha: number,
         depth: number
     ): void {
-        const layer = mapData.layers.find((candidate) => candidate.type === "tilelayer" && candidate.name === layerName);
-        if (!layer || !layer.data) {
+        if (!layer.data) {
             return;
         }
 
@@ -362,6 +374,17 @@ export class GameScene extends Scene {
                 }
             }
         }
+    }
+
+    private getFirstMapLayerByNames(mapData: TiledMapData, layerNames: readonly string[]): TiledLayerData | null {
+        for (const layerName of layerNames) {
+            const found = mapData.layers.find((candidate) => candidate.type === "tilelayer" && candidate.name === layerName);
+            if (found?.data) {
+                return found;
+            }
+        }
+
+        return null;
     }
 
     private createCollisionFromLayer(layer: TiledLayerData, tileWidth: number, tileHeight: number): void {
