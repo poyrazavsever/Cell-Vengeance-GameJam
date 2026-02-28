@@ -8,7 +8,7 @@ export class BootScene extends Scene {
     }
 
     create(): void {
-        gameState.reset();
+        gameState.hydrateProfile();
         this.scene.start(SCENE_KEYS.PRELOAD);
     }
 }

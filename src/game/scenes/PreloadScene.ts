@@ -45,8 +45,7 @@ export class PreloadScene extends Scene {
     }
 
     create(): void {
-        this.scene.start(SCENE_KEYS.GAME);
-        this.scene.launch(SCENE_KEYS.HUD);
+        this.scene.start(SCENE_KEYS.MAIN_MENU);
     }
 
     private drawLoadingBar(progress: number): void {

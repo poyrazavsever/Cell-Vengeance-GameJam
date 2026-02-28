@@ -4,14 +4,17 @@ import { createPlayerAnimations } from "../animations/playerAnimations";
 import { ASSET_KEYS } from "../constants/assetKeys";
 import { EVENT_KEYS } from "../constants/eventKeys";
 import { SCENE_KEYS } from "../constants/sceneKeys";
-import { SPAWN_POINTS } from "../data/spawnPoints";
+import { getLevelById } from "../data/levels";
+import { LevelDoor } from "../entities/level/LevelDoor";
 import { EnemyBase } from "../entities/enemies/EnemyBase";
 import { AcidProjectile } from "../entities/projectiles/AcidProjectile";
 import { Player } from "../entities/player/Player";
 import { EventBus } from "../EventBus";
 import { gameState } from "../state/GameState";
-import { DamageSource } from "../types/combat";
 import { EnemyManager } from "../systems/EnemyManager";
+import { DamageSource } from "../types/combat";
+import { LevelDefinition } from "../types/level";
+import { LevelId } from "../types/progression";
 
 interface MovementKeys extends Phaser.Types.Input.Keyboard.CursorKeys {
     leftAlt: Phaser.Input.Keyboard.Key;
@@ -22,9 +25,11 @@ interface MovementKeys extends Phaser.Types.Input.Keyboard.CursorKeys {
     debugCollect: Phaser.Input.Keyboard.Key;
 }
 
-const PLAYER_SPAWN = { x: 120, y: 620 };
+interface GameSceneData {
+    levelId?: LevelId;
+}
+
 const PLAYER_ATTACK_DURATION_MS = 140;
-const WORLD_WIDTH = 6400;
 const WORLD_HEIGHT = 768;
 
 export class GameScene extends Scene {
@@ -38,18 +43,33 @@ export class GameScene extends Scene {
     private playerAttackHitboxBody!: Physics.Arcade.Body;
     private playerAttackActive = false;
     private hitEnemiesInCurrentSwing = new Set<EnemyBase>();
+    private attackDamage = 1;
+
+    private level!: LevelDefinition;
+    private levelDoor!: LevelDoor;
+    private doorHintText!: Phaser.GameObjects.Text;
+    private isCompletingLevel = false;
 
     private unsubscribeState: (() => void) | null = null;
-    private previousLevel = 0;
+    private previousEvolution = 0;
     private walkSound: Phaser.Sound.BaseSound | null = null;
 
     constructor() {
         super(SCENE_KEYS.GAME);
     }
 
+    init(data: GameSceneData): void {
+        const snapshot = gameState.getSnapshot();
+        const requestedLevel = data.levelId ?? snapshot.profile.selectedLevel;
+        const levelId = gameState.canPlayLevel(requestedLevel) ? requestedLevel : snapshot.profile.unlockedLevel;
+        this.level = getLevelById(levelId);
+    }
+
     create(): void {
-        this.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
-        this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+        gameState.startLevel(this.level.id);
+
+        this.physics.world.setBounds(0, 0, this.level.worldWidth, WORLD_HEIGHT);
+        this.cameras.main.setBounds(0, 0, this.level.worldWidth, WORLD_HEIGHT);
 
         this.drawBackground();
         this.createRuntimeTextures();
@@ -63,50 +83,63 @@ export class GameScene extends Scene {
         this.createPickups();
         this.createPlayerAttackHitbox();
         this.createEnemyManager();
+        this.createDoor();
         this.bindCombat();
         this.bindProgressState();
         this.configureCamera();
+        this.ensureHudScene();
 
-        this.add.text(20, 128, "A/D or Left/Right: Move | J: Attack | Space/W: Jump | Shift: Dash", {
+        this.add.text(20, 152, "A/D or Left/Right: Move | J: Attack | Space/W: Jump | Shift: Dash", {
             color: "#d7f6ff",
             fontFamily: "Verdana",
             fontSize: "18px"
         }).setDepth(10).setScrollFactor(0);
 
+        this.doorHintText = this.add.text(512, 188, "Kapiya girmek icin Up bas", {
+            color: "#c8f7ff",
+            fontFamily: "Verdana",
+            fontSize: "19px",
+            backgroundColor: "#123546",
+            padding: { left: 10, right: 10, top: 6, bottom: 6 }
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(12).setVisible(false);
+
+        EventBus.emit(EVENT_KEYS.LEVEL_STARTED, { levelId: this.level.id, name: this.level.name });
         EventBus.emit(EVENT_KEYS.CURRENT_SCENE_READY, this);
 
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
             this.stopWalkSfx();
             this.walkSound?.destroy();
             this.walkSound = null;
-
             this.playerAttackHitbox.destroy();
+            this.levelDoor.destroy();
             this.unsubscribeState?.();
             this.unsubscribeState = null;
         });
     }
 
     update(time: number, delta: number): void {
-        this.handlePlayerInput(time);
+        this.handlePlayerInput();
         this.enemyManager.update(this.player, time, delta);
         this.updatePlayerAttackHitboxPosition();
         this.updateWalkSound();
         this.updateInvulnerabilityVisual(time);
+        this.updateDoorInteraction();
     }
 
-    private handlePlayerInput(time: number): void {
+    private handlePlayerInput(): void {
         const snapshot = gameState.getSnapshot();
+        const stats = snapshot.stats;
         let direction = 0;
+
         if (this.cursors.left.isDown || this.cursors.leftAlt.isDown) {
             direction = -1;
         } else if (this.cursors.right.isDown || this.cursors.rightAlt.isDown) {
             direction = 1;
         }
 
-        const canDash = snapshot.evolutionLevel >= 2;
-        const baseSpeed = canDash ? 270 : 210;
-        const dashBonus = canDash && this.cursors.dash.isDown && direction !== 0 ? 120 : 0;
-        this.player.moveHorizontal(direction, baseSpeed + dashBonus);
+        const canDash = stats.evolutionLevel >= 2;
+        const dashBonus = canDash && this.cursors.dash.isDown && direction !== 0 ? stats.dashBonus : 0;
+        this.player.moveHorizontal(direction, stats.moveBase + dashBonus);
 
         if (Input.Keyboard.JustDown(this.cursors.attack)) {
             this.triggerPlayerAttack();
@@ -119,7 +152,7 @@ export class GameScene extends Scene {
             Input.Keyboard.JustDown(this.cursors.jumpAlt);
 
         if (onGround && jumpPressed) {
-            this.player.jump(snapshot.evolutionLevel >= 1 ? 620 : 560);
+            this.player.jump(stats.jumpPower);
             this.playSfxOnce(ASSET_KEYS.SFX_PLAYER_JUMP, 0.4);
         }
 
@@ -140,36 +173,18 @@ export class GameScene extends Scene {
 
     private createLevel(): void {
         this.platforms = this.physics.add.staticGroup();
-
-        for (let x = 310; x <= WORLD_WIDTH; x += 620) {
-            this.platforms.create(x, 752, "platform-lg");
-        }
-
-        const lanePattern = [
-            { key: "platform-md", y: 620 },
-            { key: "platform-sm", y: 500 },
-            { key: "platform-md", y: 560 },
-            { key: "platform-sm", y: 430 }
-        ];
-
-        for (let i = 0; i < 11; i += 1) {
-            const x = 420 + i * 520;
-            const pattern = lanePattern[i % lanePattern.length];
-            this.platforms.create(x, pattern.y, pattern.key);
-
-            if (i % 2 === 0) {
-                this.platforms.create(x + 180, pattern.y - 95, "platform-sm");
-            }
-        }
+        this.level.platformPreset.forEach((platform) => {
+            this.platforms.create(platform.x, platform.y, platform.key);
+        });
     }
 
     private createPlayer(): void {
-        this.player = new Player(this, PLAYER_SPAWN.x, PLAYER_SPAWN.y);
+        this.player = new Player(this, this.level.spawn.x, this.level.spawn.y);
         this.physics.add.collider(this.player, this.platforms);
     }
 
     private createEnemyManager(): void {
-        this.enemyManager = new EnemyManager(this, this.platforms, SPAWN_POINTS, (enemy) => {
+        this.enemyManager = new EnemyManager(this, this.platforms, this.level.enemySpawns, (enemy) => {
             EventBus.emit(EVENT_KEYS.ENEMY_DIED, {
                 kind: enemy.kind,
                 x: enemy.x,
@@ -177,6 +192,11 @@ export class GameScene extends Scene {
             });
             this.spawnCellPointBurst(enemy.x, enemy.y, enemy.getDropCellPoints());
         });
+    }
+
+    private createDoor(): void {
+        this.levelDoor = new LevelDoor(this, this.level.door.x, this.level.door.y);
+        this.levelDoor.setOpen(true);
     }
 
     private createInput(): void {
@@ -261,7 +281,7 @@ export class GameScene extends Scene {
                     return;
                 }
 
-                const applied = enemy.takeDamage(1, "player-attack", this.time.now);
+                const applied = enemy.takeDamage(this.attackDamage, "player-attack", this.time.now);
                 if (!applied) {
                     return;
                 }
@@ -312,18 +332,22 @@ export class GameScene extends Scene {
     }
 
     private bindProgressState(): void {
-        this.unsubscribeState = gameState.onChange((progress) => {
-            this.player.updateEvolution(progress.evolutionLevel);
-            this.registry.set("cellPoints", progress.cellPoints);
-            this.registry.set("evolutionLevel", progress.evolutionLevel);
-            this.registry.set("health", progress.health);
-            EventBus.emit(EVENT_KEYS.PLAYER_PROGRESS_UPDATED, progress);
+        this.unsubscribeState = gameState.onChange((snapshot) => {
+            this.player.setEvolutionLevel(snapshot.stats.evolutionLevel);
+            this.attackDamage = snapshot.stats.attackDamage;
 
-            if (progress.evolutionLevel > this.previousLevel) {
-                EventBus.emit(EVENT_KEYS.PLAYER_EVOLVED, progress);
+            this.registry.set("runPoints", snapshot.run.runPoints);
+            this.registry.set("health", snapshot.run.health);
+            this.registry.set("wallet", snapshot.profile.walletPoints);
+
+            EventBus.emit(EVENT_KEYS.PLAYER_PROGRESS_UPDATED, snapshot);
+            EventBus.emit(EVENT_KEYS.PROFILE_UPDATED, snapshot.profile);
+
+            if (snapshot.stats.evolutionLevel > this.previousEvolution) {
+                EventBus.emit(EVENT_KEYS.PLAYER_EVOLVED, snapshot);
             }
 
-            this.previousLevel = progress.evolutionLevel;
+            this.previousEvolution = snapshot.stats.evolutionLevel;
         });
     }
 
@@ -384,7 +408,7 @@ export class GameScene extends Scene {
         EventBus.emit(EVENT_KEYS.PLAYER_DAMAGED, {
             amount,
             source,
-            progress: damageResult.snapshot
+            snapshot: damageResult.snapshot
         });
         EventBus.emit(EVENT_KEYS.COMBAT_FEEDBACK, { type: "player-hit", source });
 
@@ -407,9 +431,37 @@ export class GameScene extends Scene {
         this.stopWalkSfx();
 
         this.time.delayedCall(260, () => {
-            this.player.respawnAt(PLAYER_SPAWN.x, PLAYER_SPAWN.y);
+            this.player.respawnAt(this.level.spawn.x, this.level.spawn.y);
             gameState.restorePlayerVitals();
         });
+    }
+
+    private updateDoorInteraction(): void {
+        if (this.isCompletingLevel) {
+            return;
+        }
+
+        const playerBounds = this.player.getBounds();
+        const canEnter = this.levelDoor.isPlayerInside(playerBounds);
+        this.doorHintText.setVisible(canEnter);
+
+        if (canEnter && Input.Keyboard.JustDown(this.cursors.up)) {
+            this.completeCurrentLevel();
+        }
+    }
+
+    private completeCurrentLevel(): void {
+        if (this.isCompletingLevel) {
+            return;
+        }
+
+        this.isCompletingLevel = true;
+        this.stopWalkSfx();
+        this.scene.stop(SCENE_KEYS.HUD);
+
+        const completion = gameState.completeLevel();
+        EventBus.emit(EVENT_KEYS.LEVEL_COMPLETED, completion);
+        this.scene.start(SCENE_KEYS.LEVEL_COMPLETE, completion);
     }
 
     private spawnCellPointBurst(x: number, y: number, count: number): void {
@@ -441,7 +493,7 @@ export class GameScene extends Scene {
     }
 
     private updateInvulnerabilityVisual(time: number): void {
-        if (gameState.isPlayerInvulnerable(time) && gameState.getSnapshot().health > 0) {
+        if (gameState.isPlayerInvulnerable(time) && gameState.getSnapshot().run.health > 0) {
             this.player.setAlpha(Math.floor(time / 70) % 2 === 0 ? 0.5 : 1);
             return;
         }
@@ -494,8 +546,8 @@ export class GameScene extends Scene {
     }
 
     private drawBackground(): void {
-        this.add.rectangle(WORLD_WIDTH * 0.5, 384, WORLD_WIDTH, WORLD_HEIGHT, 0x08131b);
-        this.add.rectangle(WORLD_WIDTH * 0.5, 200, WORLD_WIDTH, 320, 0x0e2734, 0.55);
+        this.add.rectangle(this.level.worldWidth * 0.5, 384, this.level.worldWidth, WORLD_HEIGHT, 0x08131b);
+        this.add.rectangle(this.level.worldWidth * 0.5, 200, this.level.worldWidth, 320, 0x0e2734, 0.55);
     }
 
     private configureCamera(): void {
@@ -504,9 +556,18 @@ export class GameScene extends Scene {
         this.cameras.main.setFollowOffset(-180, 0);
     }
 
+    private ensureHudScene(): void {
+        if (this.scene.isActive(SCENE_KEYS.HUD)) {
+            this.scene.wake(SCENE_KEYS.HUD);
+            return;
+        }
+
+        this.scene.launch(SCENE_KEYS.HUD);
+    }
+
     private spawnPickup(): void {
-        const minX = Phaser.Math.Clamp(this.player.x + 240, 60, WORLD_WIDTH - 80);
-        const maxX = Phaser.Math.Clamp(this.player.x + 760, 80, WORLD_WIDTH - 60);
+        const minX = Phaser.Math.Clamp(this.player.x + 240, 60, this.level.worldWidth - 80);
+        const maxX = Phaser.Math.Clamp(this.player.x + 760, 80, this.level.worldWidth - 60);
         const spawnX = Phaser.Math.Between(Math.min(minX, maxX), Math.max(minX, maxX));
         const pickup = this.pickups.create(spawnX, 20, "cell-point") as Phaser.Physics.Arcade.Image;
 

@@ -56,11 +56,15 @@ export class Player extends Physics.Arcade.Sprite {
         return this.flipX ? -1 : 1;
     }
 
-    updateEvolution(level: number): void {
+    setEvolutionLevel(level: number): void {
         this.evolutionLevel = Phaser.Math.Clamp(level, 0, PLAYER_EVOLUTION_TEXTURES.length - 1);
         this.setTexture(PLAYER_EVOLUTION_TEXTURES[this.evolutionLevel], 0);
         this.refreshVisual();
         this.playAction(this.currentAction, true);
+    }
+
+    updateEvolution(level: number): void {
+        this.setEvolutionLevel(level);
     }
 
     playAction(action: PlayerAnimationAction, force = false): void {

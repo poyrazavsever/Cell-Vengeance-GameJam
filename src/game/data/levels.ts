@@ -1,0 +1,105 @@
+import { LevelDefinition, LevelPlatform } from "../types/level";
+
+const createGround = (worldWidth: number): LevelPlatform[] => {
+    const platforms: LevelPlatform[] = [];
+    for (let x = 310; x <= worldWidth; x += 620) {
+        platforms.push({ key: "platform-lg", x, y: 752 });
+    }
+
+    return platforms;
+};
+
+const level1Platforms: LevelPlatform[] = [
+    ...createGround(2400),
+    { key: "platform-md", x: 520, y: 620 },
+    { key: "platform-sm", x: 760, y: 500 },
+    { key: "platform-md", x: 1040, y: 560 },
+    { key: "platform-sm", x: 1280, y: 450 },
+    { key: "platform-md", x: 1580, y: 600 },
+    { key: "platform-sm", x: 1820, y: 500 },
+    { key: "platform-md", x: 2080, y: 560 }
+];
+
+const level2Platforms: LevelPlatform[] = [
+    ...createGround(3400),
+    { key: "platform-md", x: 520, y: 620 },
+    { key: "platform-sm", x: 760, y: 500 },
+    { key: "platform-md", x: 1060, y: 570 },
+    { key: "platform-sm", x: 1300, y: 430 },
+    { key: "platform-md", x: 1560, y: 620 },
+    { key: "platform-sm", x: 1780, y: 500 },
+    { key: "platform-md", x: 2040, y: 560 },
+    { key: "platform-sm", x: 2280, y: 430 },
+    { key: "platform-md", x: 2540, y: 620 },
+    { key: "platform-sm", x: 2780, y: 500 },
+    { key: "platform-md", x: 3060, y: 560 }
+];
+
+const level3Platforms: LevelPlatform[] = [
+    ...createGround(4600),
+    { key: "platform-md", x: 520, y: 620 },
+    { key: "platform-sm", x: 760, y: 500 },
+    { key: "platform-md", x: 1040, y: 560 },
+    { key: "platform-sm", x: 1280, y: 430 },
+    { key: "platform-md", x: 1540, y: 620 },
+    { key: "platform-sm", x: 1760, y: 500 },
+    { key: "platform-md", x: 2020, y: 560 },
+    { key: "platform-sm", x: 2260, y: 430 },
+    { key: "platform-md", x: 2520, y: 620 },
+    { key: "platform-sm", x: 2760, y: 500 },
+    { key: "platform-md", x: 3020, y: 560 },
+    { key: "platform-sm", x: 3260, y: 430 },
+    { key: "platform-md", x: 3520, y: 620 },
+    { key: "platform-sm", x: 3760, y: 500 },
+    { key: "platform-md", x: 4020, y: 560 },
+    { key: "platform-sm", x: 4260, y: 430 }
+];
+
+export const LEVELS: Record<1 | 2 | 3, LevelDefinition> = {
+    1: {
+        id: 1,
+        name: "Bolum 1 - Egitim Lab",
+        worldWidth: 2400,
+        spawn: { x: 140, y: 620 },
+        door: { x: 2280, y: 676 },
+        platformPreset: level1Platforms,
+        enemySpawns: [
+            { kind: "scout", x: 620, y: 710, patrolMinX: 460, patrolMaxX: 820 },
+            { kind: "scout", x: 1420, y: 710, patrolMinX: 1260, patrolMaxX: 1600 }
+        ]
+    },
+    2: {
+        id: 2,
+        name: "Bolum 2 - Gelisim Koridoru",
+        worldWidth: 3400,
+        spawn: { x: 140, y: 620 },
+        door: { x: 3280, y: 676 },
+        platformPreset: level2Platforms,
+        enemySpawns: [
+            { kind: "scout", x: 760, y: 710, patrolMinX: 620, patrolMaxX: 960 },
+            { kind: "spitter", x: 1560, y: 560, patrolMinX: 1480, patrolMaxX: 1660 },
+            { kind: "scout", x: 2360, y: 710, patrolMinX: 2200, patrolMaxX: 2540 },
+            { kind: "spitter", x: 2820, y: 560, patrolMinX: 2740, patrolMaxX: 2960 }
+        ]
+    },
+    3: {
+        id: 3,
+        name: "Bolum 3 - Final Laboratuvari",
+        worldWidth: 4600,
+        spawn: { x: 140, y: 620 },
+        door: { x: 4480, y: 676 },
+        platformPreset: level3Platforms,
+        enemySpawns: [
+            { kind: "scout", x: 760, y: 710, patrolMinX: 620, patrolMaxX: 940 },
+            { kind: "spitter", x: 1560, y: 560, patrolMinX: 1480, patrolMaxX: 1660 },
+            { kind: "brute", x: 2300, y: 710, patrolMinX: 2140, patrolMaxX: 2480 },
+            { kind: "scout", x: 2960, y: 710, patrolMinX: 2820, patrolMaxX: 3140 },
+            { kind: "spitter", x: 3440, y: 560, patrolMinX: 3360, patrolMaxX: 3560 },
+            { kind: "brute", x: 4000, y: 710, patrolMinX: 3840, patrolMaxX: 4180 }
+        ]
+    }
+};
+
+export const getLevelById = (id: 1 | 2 | 3): LevelDefinition => {
+    return LEVELS[id];
+};
