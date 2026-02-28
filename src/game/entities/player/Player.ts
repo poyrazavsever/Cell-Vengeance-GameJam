@@ -37,6 +37,25 @@ export class Player extends Physics.Arcade.Sprite {
         this.setVelocityY(-power);
     }
 
+    applyKnockback(horizontal: number, vertical: number): void {
+        this.setVelocity(horizontal, vertical);
+    }
+
+    respawnAt(x: number, y: number): void {
+        this.setPosition(x, y);
+        this.setVelocity(0, 0);
+        this.actionLocked = false;
+        this.lockTimer?.remove(false);
+        this.lockTimer = null;
+        this.clearTint();
+        this.setAlpha(1);
+        this.playAction("walk", true);
+    }
+
+    getFacingDirection(): number {
+        return this.flipX ? -1 : 1;
+    }
+
     updateEvolution(level: number): void {
         this.evolutionLevel = Phaser.Math.Clamp(level, 0, PLAYER_EVOLUTION_TEXTURES.length - 1);
         this.setTexture(PLAYER_EVOLUTION_TEXTURES[this.evolutionLevel], 0);

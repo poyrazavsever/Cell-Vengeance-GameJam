@@ -6,6 +6,7 @@ import { PlayerProgress } from "../state/GameState";
 import { SCENE_KEYS } from "../constants/sceneKeys";
 
 export class HudScene extends Scene {
+    private healthText!: Phaser.GameObjects.Text;
     private pointsText!: Phaser.GameObjects.Text;
     private levelText!: Phaser.GameObjects.Text;
     private stageText!: Phaser.GameObjects.Text;
@@ -15,19 +16,25 @@ export class HudScene extends Scene {
     }
 
     create(): void {
-        this.pointsText = this.add.text(20, 16, "Cell Point: 0", {
+        this.healthText = this.add.text(20, 16, "HP: 3/3", {
+            color: "#ffd17f",
+            fontFamily: "Verdana",
+            fontSize: "20px"
+        }).setScrollFactor(0);
+
+        this.pointsText = this.add.text(20, 44, "Cell Point: 0", {
             color: "#f0fdff",
             fontFamily: "Verdana",
             fontSize: "20px"
         }).setScrollFactor(0);
 
-        this.levelText = this.add.text(20, 44, "Evrim: Lv0", {
+        this.levelText = this.add.text(20, 72, "Evrim: Lv0", {
             color: "#c8f2ff",
             fontFamily: "Verdana",
             fontSize: "18px"
         }).setScrollFactor(0);
 
-        this.stageText = this.add.text(20, 70, "Form: Hücre Formu", {
+        this.stageText = this.add.text(20, 98, "Form: Hücre Formu", {
             color: "#90d8ff",
             fontFamily: "Verdana",
             fontSize: "16px"
@@ -40,6 +47,7 @@ export class HudScene extends Scene {
     }
 
     private handleProgressUpdated(progress: PlayerProgress): void {
+        this.healthText.setText(`HP: ${progress.health}/${progress.maxHealth}`);
         this.pointsText.setText(`Cell Point: ${progress.cellPoints}`);
         this.levelText.setText(`Evrim: Lv${progress.evolutionLevel}`);
 

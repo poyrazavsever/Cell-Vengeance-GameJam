@@ -1,5 +1,5 @@
 import { Scene } from "phaser";
-import { ASSET_KEYS, PLAYER_FRAME_SIZE } from "../constants/assetKeys";
+import { ASSET_KEYS, ENEMY_FRAME_SIZE, PLAYER_FRAME_SIZE } from "../constants/assetKeys";
 import { SCENE_KEYS } from "../constants/sceneKeys";
 
 export class PreloadScene extends Scene {
@@ -35,6 +35,9 @@ export class PreloadScene extends Scene {
         this.load.spritesheet(ASSET_KEYS.PLAYER_LEVEL_3, "assets/characters/3.png", { frameWidth: PLAYER_FRAME_SIZE, frameHeight: PLAYER_FRAME_SIZE });
         this.load.spritesheet(ASSET_KEYS.PLAYER_LEVEL_4, "assets/characters/4.png", { frameWidth: PLAYER_FRAME_SIZE, frameHeight: PLAYER_FRAME_SIZE });
         this.load.spritesheet(ASSET_KEYS.PLAYER_LEVEL_5, "assets/characters/5.png", { frameWidth: PLAYER_FRAME_SIZE, frameHeight: PLAYER_FRAME_SIZE });
+        this.load.spritesheet(ASSET_KEYS.ENEMY_SCOUT, "assets/enemy/Scout.png", { frameWidth: ENEMY_FRAME_SIZE, frameHeight: ENEMY_FRAME_SIZE });
+        this.load.spritesheet(ASSET_KEYS.ENEMY_SPITTER, "assets/enemy/Spitter.png", { frameWidth: ENEMY_FRAME_SIZE, frameHeight: ENEMY_FRAME_SIZE });
+        this.load.spritesheet(ASSET_KEYS.ENEMY_BRUTE, "assets/enemy/Brute.png", { frameWidth: ENEMY_FRAME_SIZE, frameHeight: ENEMY_FRAME_SIZE });
         this.load.audio(ASSET_KEYS.SFX_PLAYER_WALK, "sound/mainCharacter/walking.mp3");
         this.load.audio(ASSET_KEYS.SFX_PLAYER_JUMP, "sound/mainCharacter/jump.mp3");
         this.load.audio(ASSET_KEYS.SFX_PLAYER_ATTACK, "sound/mainCharacter/attack.mp3");
