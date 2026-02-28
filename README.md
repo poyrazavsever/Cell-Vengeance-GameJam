@@ -41,10 +41,51 @@ Phaser 3 ve Next.js üzerinde geliştirilen 2D "evolution platformer/fighter" oy
 3) Production build: `npm run build` → `dist/`
 4) Telemetri istemiyorsan `dev-nolog` / `build-nolog` kullan veya `log.js` çağrılarını kaldır.
 
-## Dizın Yapısı (özet)
-- `src/game/` — Phaser sahneleri, oyuncu/düşman kodu, EventBus.
-- `src/pages/` — Next.js sayfaları ve React köprüsü.
-- `public/assets/` — Spritelar, logo, arka planlar.
+## Dizin Yapisi
+```text
+src/
+  game/
+    config/
+      gameConfig.ts
+    constants/
+      assetKeys.ts
+      eventKeys.ts
+      sceneKeys.ts
+    data/
+      evolutionData.ts
+    entities/
+      player/
+        Player.ts
+    scenes/
+      BootScene.ts
+      PreloadScene.ts
+      GameScene.ts
+      HudScene.ts
+      index.ts
+    state/
+      GameState.ts
+    EventBus.ts
+    main.ts
+  pages/
+    index.tsx
+  App.tsx
+  PhaserGame.tsx
+
+public/
+  assets/
+    logo.png
+    characters/
+      1.png
+      2.png
+      3.png
+      4.png
+      5.png
+```
+
+- `BootScene` oyun state'ini sifirlar ve preload'a gecer.
+- `PreloadScene` butun assetleri yukler (logo + `characters/1..5.png`).
+- `GameScene` temel platform, oyuncu ve Cell Point toplama dongusunu calistirir.
+- `HudScene` puan ve evrim seviyesini EventBus uzerinden gunceller.
 
 ## Teknolojiler
 - Phaser 3.90.0

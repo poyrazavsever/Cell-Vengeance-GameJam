@@ -1,0 +1,97 @@
+import { Physics, Scene } from "phaser";
+import { PLAYER_EVOLUTION_TEXTURES } from "../../constants/assetKeys";
+import { getPlayerAnimationKey, PlayerAnimationAction } from "../../animations/playerAnimations";
+
+const BASE_SCALE = 0.32;
+
+export class Player extends Physics.Arcade.Sprite {
+    private evolutionLevel = 0;
+    private currentAction: PlayerAnimationAction = "walk";
+    private actionLocked = false;
+    private lockTimer: Phaser.Time.TimerEvent | null = null;
+
+    constructor(scene: Scene, x: number, y: number) {
+        super(scene, x, y, PLAYER_EVOLUTION_TEXTURES[0]);
+
+        scene.add.existing(this);
+        scene.physics.add.existing(this);
+
+        this.setCollideWorldBounds(true);
+        this.setBounce(0.05);
+        this.refreshVisual();
+        this.playAction("walk", true);
+    }
+
+    moveHorizontal(direction: number, speed: number): void {
+        this.setVelocityX(direction * speed);
+
+        if (direction !== 0) {
+            this.setFlipX(direction < 0);
+        }
+    }
+
+    jump(power: number): void {
+        this.setVelocityY(-power);
+    }
+
+    updateEvolution(level: number): void {
+        this.evolutionLevel = Phaser.Math.Clamp(level, 0, PLAYER_EVOLUTION_TEXTURES.length - 1);
+        this.setTexture(PLAYER_EVOLUTION_TEXTURES[this.evolutionLevel], 0);
+        this.refreshVisual();
+        this.playAction(this.currentAction, true);
+    }
+
+    playAction(action: PlayerAnimationAction, force = false): void {
+        if (this.actionLocked && !force) {
+            return;
+        }
+
+        const key = getPlayerAnimationKey(this.getCurrentTextureKey(), action);
+        if (!this.scene.anims.exists(key)) {
+            return;
+        }
+
+        const isSameAnimation = this.anims.currentAnim?.key === key && this.anims.isPlaying;
+        if (isSameAnimation && !force) {
+            return;
+        }
+
+        this.currentAction = action;
+        this.play(key, true);
+    }
+
+    playLockedAction(action: PlayerAnimationAction, durationMs: number): void {
+        this.actionLocked = true;
+        this.playAction(action, true);
+
+        this.lockTimer?.remove(false);
+        this.lockTimer = this.scene.time.delayedCall(durationMs, () => {
+            this.actionLocked = false;
+            this.lockTimer = null;
+        });
+    }
+
+    showRestFrame(): void {
+        if (this.actionLocked) {
+            return;
+        }
+
+        this.currentAction = "walk";
+        this.anims.stop();
+        this.setFrame(0);
+    }
+
+    isActionLocked(): boolean {
+        return this.actionLocked;
+    }
+
+    private refreshVisual(): void {
+        const scale = BASE_SCALE + this.evolutionLevel * 0.015;
+        this.setScale(scale);
+        this.body?.setSize(210, 290, true);
+    }
+
+    private getCurrentTextureKey(): string {
+        return PLAYER_EVOLUTION_TEXTURES[this.evolutionLevel];
+    }
+}
