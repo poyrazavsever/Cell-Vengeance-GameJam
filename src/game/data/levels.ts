@@ -2,7 +2,8 @@ import { LevelDefinition, LevelPlatform } from "../types/level";
 
 const createGround = (worldWidth: number): LevelPlatform[] => {
     const platforms: LevelPlatform[] = [];
-    for (let x = 310; x <= worldWidth; x += 620) {
+    // Add one extra ground segment so the level-end door never hangs over a gap.
+    for (let x = 310; x <= worldWidth + 310; x += 620) {
         platforms.push({ key: "platform-lg", x, y: 752 });
     }
 

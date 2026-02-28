@@ -53,6 +53,7 @@ export class GameScene extends Scene {
     private unsubscribeState: (() => void) | null = null;
     private previousEvolution = 0;
     private walkSound: Phaser.Sound.BaseSound | null = null;
+    private confirmKey!: Phaser.Input.Keyboard.Key;
 
     constructor() {
         super(SCENE_KEYS.GAME);
@@ -95,7 +96,7 @@ export class GameScene extends Scene {
             fontSize: "18px"
         }).setDepth(10).setScrollFactor(0);
 
-        this.doorHintText = this.add.text(512, 188, "Kapiya girmek icin Up bas", {
+        this.doorHintText = this.add.text(512, 188, "Kapiya girmek icin Enter bas", {
             color: "#c8f7ff",
             fontFamily: "Verdana",
             fontSize: "19px",
@@ -118,12 +119,12 @@ export class GameScene extends Scene {
     }
 
     update(time: number, delta: number): void {
+        this.updateDoorInteraction();
         this.handlePlayerInput();
         this.enemyManager.update(this.player, time, delta);
         this.updatePlayerAttackHitboxPosition();
         this.updateWalkSound();
         this.updateInvulnerabilityVisual(time);
-        this.updateDoorInteraction();
     }
 
     private handlePlayerInput(): void {
@@ -153,7 +154,7 @@ export class GameScene extends Scene {
 
         if (onGround && jumpPressed) {
             this.player.jump(stats.jumpPower);
-            this.playSfxOnce(ASSET_KEYS.SFX_PLAYER_JUMP, 0.4);
+            this.playSfxOnce(ASSET_KEYS.SFX_PLAYER_JUMP, 0.25);
         }
 
         if (!this.player.isActionLocked()) {
@@ -224,6 +225,8 @@ export class GameScene extends Scene {
             attack: altKeys.J,
             debugCollect: altKeys.E
         };
+
+        this.confirmKey = keyboard.addKey(Input.Keyboard.KeyCodes.ENTER);
     }
 
     private createCharacterSfx(): void {
@@ -445,7 +448,7 @@ export class GameScene extends Scene {
         const canEnter = this.levelDoor.isPlayerInside(playerBounds);
         this.doorHintText.setVisible(canEnter);
 
-        if (canEnter && Input.Keyboard.JustDown(this.cursors.up)) {
+        if (canEnter && Input.Keyboard.JustDown(this.confirmKey)) {
             this.completeCurrentLevel();
         }
     }
