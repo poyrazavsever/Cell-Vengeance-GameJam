@@ -14,6 +14,7 @@ import { gameState } from "../state/GameState";
 import { stopMenuMusic } from "../services/menuMusic";
 import { EnemyManager } from "../systems/EnemyManager";
 import { DamageSource } from "../types/combat";
+import { SpawnPoint } from "../types/enemy";
 import { LevelDefinition } from "../types/level";
 import { LevelId } from "../types/progression";
 
@@ -30,8 +31,32 @@ interface GameSceneData {
     levelId?: LevelId;
 }
 
+interface TiledLayerData {
+    type: string;
+    name: string;
+    width: number;
+    height: number;
+    data?: number[];
+}
+
+interface TiledMapData {
+    width: number;
+    height: number;
+    tilewidth: number;
+    tileheight: number;
+    layers: TiledLayerData[];
+}
+
+interface MapTileLookupEntry {
+    key: string;
+    width: number;
+    height: number;
+}
+
+type MapTileLookup = Record<string, MapTileLookupEntry>;
+
 const PLAYER_ATTACK_DURATION_MS = 140;
-const WORLD_HEIGHT = 768;
+const WORLD_HEIGHT = 800;
 
 export class GameScene extends Scene {
     private cursors!: MovementKeys;
@@ -50,6 +75,9 @@ export class GameScene extends Scene {
     private levelDoor!: LevelDoor;
     private doorHintText!: Phaser.GameObjects.Text;
     private isCompletingLevel = false;
+    private mapCollisionLayer: TiledLayerData | null = null;
+    private mapCollisionTileWidth = 32;
+    private mapCollisionTileHeight = 32;
 
     private unsubscribeState: (() => void) | null = null;
     private previousEvolution = 0;
@@ -176,9 +204,195 @@ export class GameScene extends Scene {
 
     private createLevel(): void {
         this.platforms = this.physics.add.staticGroup();
+        this.mapCollisionLayer = null;
+
+        if (this.level.id === 1) {
+            const mapData = this.getLevel1MapData();
+            if (mapData) {
+                this.createLevelFromMapData(mapData);
+                return;
+            }
+        }
+
         this.level.platformPreset.forEach((platform) => {
             this.platforms.create(platform.x, platform.y, platform.key);
         });
+    }
+
+    private getLevel1MapData(): TiledMapData | null {
+        const raw = this.cache.tilemap.get(ASSET_KEYS.MAP_LEVEL_1);
+        const mapData = raw?.data as TiledMapData | undefined;
+        if (!mapData || !Array.isArray(mapData.layers)) {
+            return null;
+        }
+
+        return mapData;
+    }
+
+    private createLevelFromMapData(mapData: TiledMapData): void {
+        const worldWidth = mapData.width * mapData.tilewidth;
+        const worldHeight = mapData.height * mapData.tileheight;
+        const tileLookup = this.getMapTileLookup();
+        this.level.worldWidth = worldWidth;
+        if (this.level.door.x > worldWidth - 40 || this.level.door.x < worldWidth * 0.4) {
+            this.level.door.x = Math.max(mapData.tilewidth * 2, worldWidth - mapData.tilewidth * 4);
+        }
+
+        this.physics.world.setBounds(0, 0, worldWidth, worldHeight);
+        this.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
+
+        this.drawMapLayer(mapData, "Arkaplan", tileLookup, -40, 0x143b55, 0.28);
+        this.drawMapLayer(mapData, "Üst katman", tileLookup, -30, 0x2a6288, 0.36);
+        this.drawMapLayer(mapData, "Üst+ katman", tileLookup, -20, 0x4b88a5, 0.44);
+        this.drawMapLayer(mapData, "Tile Layer 3", tileLookup, -8, 0x2d5f7b, 0.7);
+
+        const collisionLayer = mapData.layers.find((layer) => layer.type === "tilelayer" && layer.name === "Tile Layer 3");
+        if (!collisionLayer || !collisionLayer.data) {
+            return;
+        }
+
+        this.mapCollisionLayer = collisionLayer;
+        this.mapCollisionTileWidth = mapData.tilewidth;
+        this.mapCollisionTileHeight = mapData.tileheight;
+        this.createCollisionFromLayer(collisionLayer, mapData.tilewidth, mapData.tileheight);
+    }
+
+    private getMapTileLookup(): MapTileLookup {
+        const lookup = this.registry.get("map1TileLookup") as MapTileLookup | undefined;
+        return lookup ?? {};
+    }
+
+    private drawMapLayer(
+        mapData: TiledMapData,
+        layerName: string,
+        tileLookup: MapTileLookup,
+        depth: number,
+        fallbackColor: number,
+        fallbackAlpha: number
+    ): void {
+        const drawnWithTextures = this.drawMapLayerTiles(mapData, layerName, tileLookup, depth);
+        if (drawnWithTextures) {
+            return;
+        }
+
+        this.drawMapLayerRuns(mapData, layerName, fallbackColor, fallbackAlpha, depth);
+    }
+
+    private drawMapLayerTiles(
+        mapData: TiledMapData,
+        layerName: string,
+        tileLookup: MapTileLookup,
+        depth: number
+    ): boolean {
+        const layer = mapData.layers.find((candidate) => candidate.type === "tilelayer" && candidate.name === layerName);
+        if (!layer || !layer.data) {
+            return false;
+        }
+
+        const tileWidth = mapData.tilewidth;
+        const tileHeight = mapData.tileheight;
+        const renderTexture = this.add
+            .renderTexture(0, 0, layer.width * tileWidth, layer.height * tileHeight)
+            .setOrigin(0, 0)
+            .setDepth(depth);
+
+        let drawnCount = 0;
+        for (let y = 0; y < layer.height; y += 1) {
+            for (let x = 0; x < layer.width; x += 1) {
+                const gid = layer.data[y * layer.width + x];
+                if (gid <= 0) {
+                    continue;
+                }
+
+                const tileEntry = tileLookup[String(gid)];
+                if (!tileEntry || !this.textures.exists(tileEntry.key)) {
+                    continue;
+                }
+
+                const drawX = x * tileWidth;
+                const drawY = y * tileHeight + tileHeight - tileEntry.height;
+                renderTexture.draw(tileEntry.key, drawX, drawY);
+                drawnCount += 1;
+            }
+        }
+
+        if (drawnCount > 0) {
+            return true;
+        }
+
+        renderTexture.destroy();
+        return false;
+    }
+
+    private drawMapLayerRuns(
+        mapData: TiledMapData,
+        layerName: string,
+        color: number,
+        alpha: number,
+        depth: number
+    ): void {
+        const layer = mapData.layers.find((candidate) => candidate.type === "tilelayer" && candidate.name === layerName);
+        if (!layer || !layer.data) {
+            return;
+        }
+
+        const graphics = this.add.graphics().setDepth(depth);
+        graphics.fillStyle(color, alpha);
+
+        const tileWidth = mapData.tilewidth;
+        const tileHeight = mapData.tileheight;
+        const layerWidth = layer.width;
+        const layerHeight = layer.height;
+
+        for (let y = 0; y < layerHeight; y += 1) {
+            let runStart = -1;
+            for (let x = 0; x <= layerWidth; x += 1) {
+                const index = x < layerWidth ? layer.data[y * layerWidth + x] : 0;
+                const hasTile = index > 0;
+
+                if (hasTile && runStart === -1) {
+                    runStart = x;
+                    continue;
+                }
+
+                if (!hasTile && runStart !== -1) {
+                    const runLength = x - runStart;
+                    graphics.fillRect(runStart * tileWidth, y * tileHeight, runLength * tileWidth, tileHeight);
+                    runStart = -1;
+                }
+            }
+        }
+    }
+
+    private createCollisionFromLayer(layer: TiledLayerData, tileWidth: number, tileHeight: number): void {
+        if (!layer.data) {
+            return;
+        }
+
+        for (let y = 0; y < layer.height; y += 1) {
+            let runStart = -1;
+            for (let x = 0; x <= layer.width; x += 1) {
+                const index = x < layer.width ? layer.data[y * layer.width + x] : 0;
+                const hasTile = index > 0;
+
+                if (hasTile && runStart === -1) {
+                    runStart = x;
+                    continue;
+                }
+
+                if (!hasTile && runStart !== -1) {
+                    const runLength = x - runStart;
+                    const runPixelWidth = runLength * tileWidth;
+                    const centerX = runStart * tileWidth + runPixelWidth * 0.5;
+                    const centerY = y * tileHeight + tileHeight * 0.5;
+                    const collider = this.platforms.create(centerX, centerY, "platform-pixel") as Phaser.Physics.Arcade.Image;
+                    collider.setVisible(false);
+                    collider.setDisplaySize(runPixelWidth, tileHeight);
+                    collider.refreshBody();
+                    runStart = -1;
+                }
+            }
+        }
     }
 
     private createPlayer(): void {
@@ -187,7 +401,11 @@ export class GameScene extends Scene {
     }
 
     private createEnemyManager(): void {
-        this.enemyManager = new EnemyManager(this, this.platforms, this.level.enemySpawns, (enemy) => {
+        const spawnPoints = this.mapCollisionLayer
+            ? this.resolveEnemySpawnsForMap(this.level.enemySpawns)
+            : this.level.enemySpawns;
+
+        this.enemyManager = new EnemyManager(this, this.platforms, spawnPoints, (enemy) => {
             EventBus.emit(EVENT_KEYS.ENEMY_DIED, {
                 kind: enemy.kind,
                 x: enemy.x,
@@ -195,6 +413,76 @@ export class GameScene extends Scene {
             });
             this.spawnCellPointBurst(enemy.x, enemy.y, enemy.getDropCellPoints());
         });
+    }
+
+    private resolveEnemySpawnsForMap(spawnPoints: SpawnPoint[]): SpawnPoint[] {
+        return spawnPoints.map((spawn) => {
+            const resolved = this.findBestSurfaceForSpawn(spawn.x, spawn.y);
+            if (!resolved) {
+                return spawn;
+            }
+
+            // Enemies use center-origin; keep a stable gap between their feet and tile top.
+            const enemyCenterYOffset = 26;
+            return {
+                ...spawn,
+                x: resolved.centerX,
+                y: resolved.topY - enemyCenterYOffset
+            };
+        });
+    }
+
+    private findBestSurfaceForSpawn(
+        worldX: number,
+        desiredY: number
+    ): { centerX: number; topY: number } | null {
+        const layer = this.mapCollisionLayer;
+        if (!layer?.data) {
+            return null;
+        }
+
+        const tileWidth = this.mapCollisionTileWidth;
+        const tileHeight = this.mapCollisionTileHeight;
+        const baseTileX = Phaser.Math.Clamp(Math.floor(worldX / tileWidth), 0, layer.width - 1);
+        const searchRadiusTiles = 6;
+
+        let bestCandidate: { centerX: number; topY: number; score: number } | null = null;
+
+        for (
+            let tileX = Math.max(0, baseTileX - searchRadiusTiles);
+            tileX <= Math.min(layer.width - 1, baseTileX + searchRadiusTiles);
+            tileX += 1
+        ) {
+            const centerX = tileX * tileWidth + tileWidth * 0.5;
+            for (let tileY = 0; tileY < layer.height; tileY += 1) {
+                const index = tileY * layer.width + tileX;
+                const isSolid = layer.data[index] > 0;
+                if (!isSolid) {
+                    continue;
+                }
+
+                const hasSolidAbove = tileY > 0 && layer.data[(tileY - 1) * layer.width + tileX] > 0;
+                if (hasSolidAbove) {
+                    continue;
+                }
+
+                const topY = tileY * tileHeight;
+                const score = Math.abs(topY - desiredY) + Math.abs(centerX - worldX) * 0.35;
+
+                if (!bestCandidate || score < bestCandidate.score) {
+                    bestCandidate = { centerX, topY, score };
+                }
+            }
+        }
+
+        if (!bestCandidate) {
+            return null;
+        }
+
+        return {
+            centerX: bestCandidate.centerX,
+            topY: bestCandidate.topY
+        };
     }
 
     private createDoor(): void {
@@ -539,6 +827,11 @@ export class GameScene extends Scene {
         graphics.generateTexture("platform-sm", 200, 24);
         graphics.clear();
 
+        graphics.fillStyle(0xffffff, 1);
+        graphics.fillRect(0, 0, 1, 1);
+        graphics.generateTexture("platform-pixel", 1, 1);
+        graphics.clear();
+
         graphics.fillStyle(0x75fff0, 1);
         graphics.fillCircle(10, 10, 10);
         graphics.generateTexture("cell-point", 20, 20);
@@ -551,8 +844,12 @@ export class GameScene extends Scene {
     }
 
     private drawBackground(): void {
-        this.add.rectangle(this.level.worldWidth * 0.5, 384, this.level.worldWidth, WORLD_HEIGHT, 0x08131b);
-        this.add.rectangle(this.level.worldWidth * 0.5, 200, this.level.worldWidth, 320, 0x0e2734, 0.55);
+        this.add
+            .rectangle(this.level.worldWidth * 0.5, WORLD_HEIGHT * 0.5, this.level.worldWidth, WORLD_HEIGHT, 0x08131b)
+            .setDepth(-100);
+        this.add
+            .rectangle(this.level.worldWidth * 0.5, 200, this.level.worldWidth, 320, 0x0e2734, 0.55)
+            .setDepth(-90);
     }
 
     private configureCamera(): void {
