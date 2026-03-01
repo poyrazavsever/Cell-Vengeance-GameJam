@@ -41,11 +41,11 @@ export class LevelCompleteScene extends Scene {
     create(): void {
         ensureMenuMusic(this);
         drawMenuBackground(this);
-        drawMenuHeader(this, `Bölüm ${this.payload.levelId} Tamamlandı`, "Market ekranında güçlen");
-        createMenuLabel(this, 512, 362, `Kazanılan: +${this.payload.earned} CP`, 24, "#b2ecff");
+        drawMenuHeader(this, `Bölüm ${this.payload.levelId} Tamamlandı`, "Artan hücreleri markette harca");
+        createMenuLabel(this, 512, 362, `Bölüm Sonu Artan Hücre: +${this.payload.earned} CP`, 24, "#b2ecff");
         this.walletText = createMenuLabel(this, 512, 392, `Cüzdan: ${gameState.getSnapshot().profile.walletPoints} CP`, 24, "#ffe1a0");
         createMenuCard(this, { x: 512, y: 566, width: 932, height: 372 });
-        createMenuLabel(this, 512, 425, "Market - Evrim ve güçlendirmeler", 24, "#9fdfff");
+        createMenuLabel(this, 512, 425, "Market - Özellik Güçlendirmeleri", 24, "#9fdfff");
 
         this.createShopRows();
         this.refreshShopRows();

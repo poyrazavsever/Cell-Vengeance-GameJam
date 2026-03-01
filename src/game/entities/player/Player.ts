@@ -1,21 +1,23 @@
 import { Physics, Scene } from "phaser";
-import { PLAYER_EVOLUTION_TEXTURES } from "../../constants/assetKeys";
+import { ASSET_KEYS } from "../../constants/assetKeys";
 import { getPlayerAnimationKey, PlayerAnimationAction } from "../../animations/playerAnimations";
+import { GROWTH_STAGE_SCALES } from "../../data/growthConfig";
+import { GrowthStage } from "../../types/progression";
 
-const BASE_SCALE = 0.48;
 const BODY_WIDTH_RATIO = 0.56;
 const BODY_HEIGHT_RATIO = 0.62;
 const BODY_BOTTOM_TRIM_RATIO = 0.08;
 
 export class Player extends Physics.Arcade.Sprite {
-    private evolutionLevel = 0;
+    private growthStage: GrowthStage = 0;
     private currentAction: PlayerAnimationAction = "walk";
     private actionLocked = false;
     private lockTimer: Phaser.Time.TimerEvent | null = null;
     private climbing = false;
+    private growthTween: Phaser.Tweens.Tween | null = null;
 
     constructor(scene: Scene, x: number, y: number) {
-        super(scene, x, y, PLAYER_EVOLUTION_TEXTURES[0]);
+        super(scene, x, y, ASSET_KEYS.PLAYER_LEVEL_1);
 
         scene.add.existing(this);
         scene.physics.add.existing(this);
@@ -77,6 +79,9 @@ export class Player extends Physics.Arcade.Sprite {
         this.lockTimer = null;
         this.clearTint();
         this.setAlpha(1);
+        this.growthTween?.stop();
+        this.growthTween = null;
+        this.setScale(GROWTH_STAGE_SCALES[this.growthStage]);
         this.playAction("walk", true);
     }
 
@@ -84,15 +89,30 @@ export class Player extends Physics.Arcade.Sprite {
         return this.flipX ? -1 : 1;
     }
 
-    setEvolutionLevel(level: number): void {
-        this.evolutionLevel = Phaser.Math.Clamp(level, 0, PLAYER_EVOLUTION_TEXTURES.length - 1);
-        this.setTexture(PLAYER_EVOLUTION_TEXTURES[this.evolutionLevel], 0);
+    setGrowthStage(stage: GrowthStage): void {
+        this.growthStage = stage;
+        this.setTexture(ASSET_KEYS.PLAYER_LEVEL_1, 0);
         this.refreshVisual();
         this.playAction(this.currentAction, true);
     }
 
-    updateEvolution(level: number): void {
-        this.setEvolutionLevel(level);
+    playGrowthEffect(): void {
+        const baseScale = GROWTH_STAGE_SCALES[this.growthStage];
+        this.growthTween?.stop();
+        this.growthTween = this.scene.tweens.add({
+            targets: this,
+            scaleX: baseScale * 1.08,
+            scaleY: baseScale * 1.08,
+            duration: 110,
+            yoyo: true,
+            ease: "Sine.easeOut",
+            onStart: () => this.setTint(0xa8ffef),
+            onComplete: () => {
+                this.clearTint();
+                this.setScale(baseScale);
+                this.growthTween = null;
+            }
+        });
     }
 
     playAction(action: PlayerAnimationAction, force = false): void {
@@ -140,13 +160,8 @@ export class Player extends Physics.Arcade.Sprite {
     }
 
     private refreshVisual(): void {
-        const scale = BASE_SCALE + this.evolutionLevel * 0.015;
-        this.setScale(scale);
+        this.setScale(GROWTH_STAGE_SCALES[this.growthStage]);
         this.refreshBodySize();
-    }
-
-    private getCurrentTextureKey(): string {
-        return PLAYER_EVOLUTION_TEXTURES[this.evolutionLevel];
     }
 
     private refreshBodySize(): void {
@@ -164,5 +179,9 @@ export class Player extends Physics.Arcade.Sprite {
 
         body.setSize(bodyWidth, bodyHeight);
         body.setOffset(offsetX, offsetY);
+    }
+
+    private getCurrentTextureKey(): string {
+        return ASSET_KEYS.PLAYER_LEVEL_1;
     }
 }

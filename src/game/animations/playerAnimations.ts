@@ -1,5 +1,5 @@
 import { Scene } from "phaser";
-import { PLAYER_EVOLUTION_TEXTURES } from "../constants/assetKeys";
+import { PLAYER_TEXTURE_KEYS } from "../constants/assetKeys";
 
 export type PlayerAnimationAction = "walk" | "jump" | "attack" | "hit" | "climb";
 
@@ -16,7 +16,7 @@ export const getPlayerAnimationKey = (textureKey: string, action: PlayerAnimatio
 };
 
 export const createPlayerAnimations = (scene: Scene): void => {
-    for (const textureKey of PLAYER_EVOLUTION_TEXTURES) {
+    for (const textureKey of PLAYER_TEXTURE_KEYS) {
         for (const action of Object.keys(ACTION_FRAME_RANGES) as PlayerAnimationAction[]) {
             const animationKey = getPlayerAnimationKey(textureKey, action);
             if (scene.anims.exists(animationKey)) {

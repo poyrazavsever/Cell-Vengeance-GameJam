@@ -1,12 +1,13 @@
 export type LevelId = 1 | 2 | 3;
 
 export type UpgradeKey =
-    | "evolution"
     | "maxHp"
     | "attack"
     | "moveSpeed"
     | "jumpPower"
     | "dashBoost";
+
+export type GrowthStage = 0 | 1 | 2 | 3;
 
 export interface ProfileState {
     unlockedLevel: LevelId;
@@ -18,19 +19,22 @@ export interface ProfileState {
 
 export interface RunState {
     levelId: LevelId;
-    runPoints: number;
+    collectedCells: number;
+    spentForGrowth: number;
+    residualCells: number;
+    growthStage: GrowthStage;
     health: number;
     maxHealth: number;
     invulnerableUntil: number;
 }
 
 export interface PlayerStats {
-    evolutionLevel: number;
     maxHealth: number;
     attackDamage: number;
     moveBase: number;
     jumpPower: number;
     dashBonus: number;
+    canDash: boolean;
 }
 
 export interface GameSnapshot {

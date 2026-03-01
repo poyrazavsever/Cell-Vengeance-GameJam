@@ -65,10 +65,6 @@ export class PreloadScene extends Scene {
         this.load.text(TSX_CACHE_KEYS["tiles.tsx"], "maps/tiles.tsx");
         this.load.text(TSX_CACHE_KEYS["objects.tsx"], "maps/objects.tsx");
         this.load.spritesheet(ASSET_KEYS.PLAYER_LEVEL_1, "assets/characters/1.png", { frameWidth: PLAYER_FRAME_SIZE, frameHeight: PLAYER_FRAME_SIZE });
-        this.load.spritesheet(ASSET_KEYS.PLAYER_LEVEL_2, "assets/characters/2.png", { frameWidth: PLAYER_FRAME_SIZE, frameHeight: PLAYER_FRAME_SIZE });
-        this.load.spritesheet(ASSET_KEYS.PLAYER_LEVEL_3, "assets/characters/3.png", { frameWidth: PLAYER_FRAME_SIZE, frameHeight: PLAYER_FRAME_SIZE });
-        this.load.spritesheet(ASSET_KEYS.PLAYER_LEVEL_4, "assets/characters/4.png", { frameWidth: PLAYER_FRAME_SIZE, frameHeight: PLAYER_FRAME_SIZE });
-        this.load.spritesheet(ASSET_KEYS.PLAYER_LEVEL_5, "assets/characters/5.png", { frameWidth: PLAYER_FRAME_SIZE, frameHeight: PLAYER_FRAME_SIZE });
         this.load.spritesheet(ASSET_KEYS.ENEMY_SCOUT, "assets/enemy/Scout.png", { frameWidth: ENEMY_FRAME_SIZE, frameHeight: ENEMY_FRAME_SIZE });
         this.load.spritesheet(ASSET_KEYS.ENEMY_SPITTER, "assets/enemy/Spitter.png", { frameWidth: ENEMY_FRAME_SIZE, frameHeight: ENEMY_FRAME_SIZE });
         this.load.spritesheet(ASSET_KEYS.ENEMY_BRUTE, "assets/enemy/Brute.png", { frameWidth: ENEMY_FRAME_SIZE, frameHeight: ENEMY_FRAME_SIZE });

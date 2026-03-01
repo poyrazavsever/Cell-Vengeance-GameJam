@@ -90,7 +90,7 @@ export class GameScene extends Scene {
     private mapCollisionTileHeight = 32;
 
     private unsubscribeState: (() => void) | null = null;
-    private previousEvolution = 0;
+    private previousGrowthStage = 0;
     private walkSound: Phaser.Sound.BaseSound | null = null;
     private confirmKey!: Phaser.Input.Keyboard.Key;
     private ladderZones!: Phaser.Physics.Arcade.StaticGroup;
@@ -221,8 +221,7 @@ export class GameScene extends Scene {
         }
 
         // --- Normal movement ---
-        const canDash = stats.evolutionLevel >= 2;
-        const dashBonus = canDash && this.cursors.dash.isDown && direction !== 0 ? stats.dashBonus : 0;
+        const dashBonus = stats.canDash && this.cursors.dash.isDown && direction !== 0 ? stats.dashBonus : 0;
         this.player.moveHorizontal(direction, stats.moveBase + dashBonus);
 
         if (Input.Keyboard.JustDown(this.cursors.attack)) {
@@ -698,9 +697,7 @@ export class GameScene extends Scene {
         this.physics.add.collider(this.pickups, this.platforms);
         this.physics.add.overlap(this.player, this.pickups, (_player, pickup) => {
             const pickupObject = pickup as Phaser.Physics.Arcade.Image;
-            const value = pickupObject.getData("value") as number | undefined;
-            pickupObject.destroy();
-            gameState.addCellPoints(value ?? 1);
+            this.absorbPickup(pickupObject);
         });
 
         this.time.addEvent({
@@ -787,21 +784,24 @@ export class GameScene extends Scene {
 
     private bindProgressState(): void {
         this.unsubscribeState = gameState.onChange((snapshot) => {
-            this.player.setEvolutionLevel(snapshot.stats.evolutionLevel);
+            this.player.setGrowthStage(snapshot.run.growthStage);
             this.attackDamage = snapshot.stats.attackDamage;
 
-            this.registry.set("runPoints", snapshot.run.runPoints);
+            this.registry.set("collectedCells", snapshot.run.collectedCells);
+            this.registry.set("residualCells", snapshot.run.residualCells);
             this.registry.set("health", snapshot.run.health);
             this.registry.set("wallet", snapshot.profile.walletPoints);
 
             EventBus.emit(EVENT_KEYS.PLAYER_PROGRESS_UPDATED, snapshot);
             EventBus.emit(EVENT_KEYS.PROFILE_UPDATED, snapshot.profile);
 
-            if (snapshot.stats.evolutionLevel > this.previousEvolution) {
-                EventBus.emit(EVENT_KEYS.PLAYER_EVOLVED, snapshot);
+            if (snapshot.run.growthStage > this.previousGrowthStage) {
+                this.player.playGrowthEffect();
+                this.cameras.main.shake(80, 0.0035);
+                EventBus.emit(EVENT_KEYS.PLAYER_GROWTH_STAGE_CHANGED, snapshot);
             }
 
-            this.previousEvolution = snapshot.stats.evolutionLevel;
+            this.previousGrowthStage = snapshot.run.growthStage;
         });
     }
 
@@ -933,6 +933,36 @@ export class GameScene extends Scene {
             pickup.setData("value", 1);
             pickup.setVelocity(Phaser.Math.Between(-120, 120), Phaser.Math.Between(-240, -110));
         }
+    }
+
+    private absorbPickup(pickup: Phaser.Physics.Arcade.Image): void {
+        if (!pickup.active || pickup.getData("absorbing")) {
+            return;
+        }
+
+        const value = pickup.getData("value") as number | undefined;
+        pickup.setData("absorbing", true);
+        pickup.body?.stop();
+        if (pickup.body instanceof Physics.Arcade.Body) {
+            pickup.body.enable = false;
+            pickup.body.setAllowGravity(false);
+        }
+        pickup.setVelocity(0, 0);
+        pickup.setDepth(32);
+
+        this.tweens.add({
+            targets: pickup,
+            x: this.player.x,
+            y: this.player.y - 8,
+            scale: 0.2,
+            alpha: 0.25,
+            duration: Phaser.Math.Between(160, 220),
+            ease: "Sine.easeIn",
+            onComplete: () => {
+                pickup.destroy();
+                gameState.addCellPoints(value ?? 1);
+            }
+        });
     }
 
     private updateWalkSound(): void {

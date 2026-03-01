@@ -9,7 +9,7 @@ export default function Home() {
         <>
             <Head>
                 <title>CELL-VENGEANCE</title>
-                <meta name="description" content="Cell-Vengeance: Phaser.js ile gelistirilen 2D evolution platformer/fighter oyunu." />
+                <meta name="description" content="Cell-Vengeance: Phaser.js ile geliştirilen 2D aksiyon platform oyunu." />
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
                 <link rel="icon" href="/favicon.png" />
             </Head>

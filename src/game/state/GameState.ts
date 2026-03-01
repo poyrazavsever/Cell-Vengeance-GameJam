@@ -1,7 +1,9 @@
+import { GROWTH_THRESHOLDS } from "../data/growthConfig";
 import { SHOP_CATALOG } from "../data/shopCatalog";
 import { loadProfileFromStorage, saveProfileToStorage } from "../services/persistence";
 import {
     GameSnapshot,
+    GrowthStage,
     LevelCompletionResult,
     LevelId,
     PlayerStats,
@@ -22,7 +24,6 @@ export interface DamageResult {
 const PLAYER_IFRAME_MS = 700;
 
 const DEFAULT_UPGRADES: Record<UpgradeKey, number> = {
-    evolution: 0,
     maxHp: 0,
     attack: 0,
     moveSpeed: 0,
@@ -65,34 +66,58 @@ const cloneProfile = (profile: ProfileState): ProfileState => {
     };
 };
 
-export class GameState {
-    private profile: ProfileState = cloneProfile(DEFAULT_PROFILE);
-    private run: RunState = {
-        levelId: 1,
-        runPoints: 0,
-        health: 3,
-        maxHealth: 3,
+const resolveGrowthStage = (collectedCells: number): GrowthStage => {
+    if (collectedCells >= GROWTH_THRESHOLDS[2]) {
+        return 3;
+    }
+
+    if (collectedCells >= GROWTH_THRESHOLDS[1]) {
+        return 2;
+    }
+
+    if (collectedCells >= GROWTH_THRESHOLDS[0]) {
+        return 1;
+    }
+
+    return 0;
+};
+
+const resolveSpentForGrowth = (stage: GrowthStage): number => {
+    if (stage === 0) {
+        return 0;
+    }
+
+    return GROWTH_THRESHOLDS[stage - 1];
+};
+
+const createRunState = (levelId: LevelId, maxHealth: number): RunState => {
+    return {
+        levelId,
+        collectedCells: 0,
+        spentForGrowth: 0,
+        residualCells: 0,
+        growthStage: 0,
+        health: maxHealth,
+        maxHealth,
         invulnerableUntil: 0
     };
+};
+
+export class GameState {
+    private profile: ProfileState = cloneProfile(DEFAULT_PROFILE);
+    private run: RunState = createRunState(1, 3);
     private listeners: Set<SnapshotListener> = new Set();
 
     constructor() {
         const stats = this.computePlayerStats();
-        this.run.maxHealth = stats.maxHealth;
-        this.run.health = stats.maxHealth;
+        this.run = createRunState(1, stats.maxHealth);
     }
 
     hydrateProfile(): GameSnapshot {
         const loaded = loadProfileFromStorage();
         this.profile = this.normalizeProfile(loaded);
         const stats = this.computePlayerStats();
-        this.run = {
-            levelId: this.profile.selectedLevel,
-            runPoints: 0,
-            health: stats.maxHealth,
-            maxHealth: stats.maxHealth,
-            invulnerableUntil: 0
-        };
+        this.run = createRunState(this.profile.selectedLevel, stats.maxHealth);
         this.notify();
         return this.getSnapshot();
     }
@@ -121,13 +146,7 @@ export class GameState {
     startLevel(levelId: LevelId): GameSnapshot {
         this.profile.selectedLevel = levelId;
         const stats = this.computePlayerStats();
-        this.run = {
-            levelId,
-            runPoints: 0,
-            health: stats.maxHealth,
-            maxHealth: stats.maxHealth,
-            invulnerableUntil: 0
-        };
+        this.run = createRunState(levelId, stats.maxHealth);
         this.persistProfile();
         this.notify();
         return this.getSnapshot();
@@ -145,7 +164,16 @@ export class GameState {
     }
 
     addCellPoints(points: number): GameSnapshot {
-        this.run.runPoints += Math.max(points, 0);
+        const safePoints = Math.max(points, 0);
+        if (safePoints === 0) {
+            return this.getSnapshot();
+        }
+
+        this.run.collectedCells += safePoints;
+        const growthStage = resolveGrowthStage(this.run.collectedCells);
+        this.run.growthStage = growthStage;
+        this.run.spentForGrowth = resolveSpentForGrowth(growthStage);
+        this.run.residualCells = Math.max(0, this.run.collectedCells - this.run.spentForGrowth);
         this.notify();
         return this.getSnapshot();
     }
@@ -195,15 +223,17 @@ export class GameState {
 
     completeLevel(): LevelCompletionResult {
         const levelId = this.run.levelId;
-        const earned = this.run.runPoints;
+        const earned = this.run.residualCells;
         const walletBefore = this.profile.walletPoints;
         this.profile.walletPoints += earned;
-        this.run.runPoints = 0;
 
         const nextLevel = this.unlockNextLevelIfNeeded(levelId);
         if (levelId === 3) {
             this.profile.finaleSeen = true;
         }
+
+        const stats = this.computePlayerStats();
+        this.run = createRunState(levelId, stats.maxHealth);
 
         this.persistProfile();
         this.notify();
@@ -265,12 +295,12 @@ export class GameState {
 
     computePlayerStats(): PlayerStats {
         return {
-            evolutionLevel: Phaser.Math.Clamp(this.profile.upgrades.evolution, 0, 4),
             maxHealth: 3 + this.profile.upgrades.maxHp,
             attackDamage: 1 + this.profile.upgrades.attack,
             moveBase: 210 + this.profile.upgrades.moveSpeed * 20,
             jumpPower: 560 + this.profile.upgrades.jumpPower * 25,
-            dashBonus: 120 + this.profile.upgrades.dashBoost * 25
+            dashBonus: 120 + this.profile.upgrades.dashBoost * 25,
+            canDash: this.profile.upgrades.dashBoost > 0
         };
     }
 
@@ -285,13 +315,7 @@ export class GameState {
     resetAllProgress(): GameSnapshot {
         this.profile = cloneProfile(DEFAULT_PROFILE);
         const stats = this.computePlayerStats();
-        this.run = {
-            levelId: 1,
-            runPoints: 0,
-            health: stats.maxHealth,
-            maxHealth: stats.maxHealth,
-            invulnerableUntil: 0
-        };
+        this.run = createRunState(1, stats.maxHealth);
         this.persistProfile();
         this.notify();
         return this.getSnapshot();
@@ -302,7 +326,9 @@ export class GameState {
             return cloneProfile(DEFAULT_PROFILE);
         }
 
-        const source = rawProfile as Partial<ProfileState>;
+        const source = rawProfile as Partial<ProfileState> & {
+            upgrades?: Partial<Record<string, number>>;
+        };
         const upgrades = source.upgrades ?? DEFAULT_UPGRADES;
         const unlockedLevel = clampLevelId(Number(source.unlockedLevel ?? 1));
         const selectedLevel = clampLevelId(Number(source.selectedLevel ?? 1));
@@ -314,7 +340,6 @@ export class GameState {
             selectedLevel: safeSelectedLevel,
             walletPoints: Math.max(0, Number(source.walletPoints ?? 0)),
             upgrades: {
-                evolution: clampUpgradeLevel("evolution", Number(upgrades.evolution ?? 0)),
                 maxHp: clampUpgradeLevel("maxHp", Number(upgrades.maxHp ?? 0)),
                 attack: clampUpgradeLevel("attack", Number(upgrades.attack ?? 0)),
                 moveSpeed: clampUpgradeLevel("moveSpeed", Number(upgrades.moveSpeed ?? 0)),

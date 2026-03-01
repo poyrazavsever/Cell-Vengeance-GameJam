@@ -1,97 +1,111 @@
 # CELL-VENGEANCE
 
-![CELL-VENGEANCE](public/assets/logo.png)
+![CELL-VENGEANCE Logo](public/assets/logo.png)
 
-Phaser 3 ve Next.js üzerinde geliştirilen 2D "evolution platformer/fighter" oyunu. Tek bölümde (Laboratuvar) hücre formundan kaslı bir organizmaya evrilip Dr. Malignant'ı alt etmeyi hedefliyoruz.
+CELL-VENGEANCE, Phaser 3 + Next.js ile geliştirilen 2D aksiyon platform oyunudur. Oyuncu düşmanlardan düşen hücreleri emerek bölüm içinde görsel olarak büyür; bölüm sonundaki markette ise artan hücrelerle kalıcı güçlendirmeler satın alır.
 
 ## Oynanış Özeti
-- Düşmanları zıplayarak veya yakın dövüşle öldür, düşen **Cell Point**'leri topla.
-- Eşiklere (10 / 25 / 50) ulaşınca otomatik evrim sahnesi tetiklenir, yeni form ve hareketler açılır.
-- Bölüm sonunda boss kapısı açılır; Dr. Malignant üç atak paternine sahiptir.
+- Düşmanları `J` saldırısı veya üstten stomp ile etkisiz hale getir.
+- Düşen hücre pickup'ları oyuncuya animasyonla çekilir ve puan işlenir.
+- Büyüme eşiklerinde (12 / 28 / 52) oyuncu görsel olarak büyür.
+- Bölüm sonunda kapı temasında `Enter` ile geçiş yapılır.
+- Bölüm sonu ekranında yalnızca artan hücreler cüzdana aktarılır ve markette harcanır.
 
-## Evrim Basamakları
-| Seviye | Görünüm | Yeni Mekanik | Tuş | Not |
-| --- | --- | --- | --- | --- |
-| 0 | Basit hücre/top | Zıplama, stomp | `Space` / `↑` | Küçük hurtbox |
-| 1 | Kas dokusu, kollar | Hafif yumruk | `J` | Kısa menzil |
-| 2 | Kemik dokusu, bacak | Koşu/dash, tekme | `Shift` + yön / `K` | Momentum, itme |
-| 3 | Gelişmiş, iri | Havaya yumruk → rüzgar dalgası | `K` | Küçük projectile |
-| MAX | Parlayan form | Mini-Clone bot | Pasif | Bot yakın dövüş yapar |
+## Büyüme Sistemi (Evrim Yerine)
+Büyüme artık marketten satın alınmaz; bölüm içinde toplanan hücreye bağlıdır.
+
+- `collectedCells`: Toplanan toplam hücre
+- `spentForGrowth`: Büyüme eşiklerinde harcanan hücre
+- `residualCells`: Cüzdana taşınan artan hücre
+
+Formül:
+- `residualCells = collectedCells - spentForGrowth`
+
+Büyüme aşamaları (yalnızca görsel):
+- Aşama 0 -> `0.48`
+- Aşama 1 -> `0.54`
+- Aşama 2 -> `0.60`
+- Aşama 3 -> `0.66`
+
+## Market Ürünleri
+- `maxHp`: Maksimum can
+- `attack`: Saldırı gücü
+- `moveSpeed`: Yürüme/koşu hızı
+- `jumpPower`: Zıplama kuvveti
+- `dashBoost`: Dash bonusu
+
+Not: Dash artık evrime değil, `dashBoost >= 1` koşuluna bağlıdır.
+
+## Bölüm Akışı
+- Toplam 3 bölüm vardır.
+- Başlangıçta yalnızca Bölüm 1 açıktır, bitirdikçe yeni bölüm açılır.
+- 3. bölüm sonrası “Oyunun devamı gelecek” ekranı gösterilir ve serbest bölüm seçimi açılır.
 
 ## Kontroller
-- **Hareket:** `A/D` veya ok tuşları
-- **Zıplama / Stomp:** `Space` veya `↑`
-- **Hafif Saldırı:** `J`
-- **Ağır / Özel:** `K`
-- **Koşu/Dash:** `Shift` (Seviye 2+)
-
-## Bölüm Yapısı (Laboratuvar)
-- **Aşama A – Eğitim:** Basit platformlar, zayıf düşman; Lv1 açılır.
-- **Aşama B – Gelişim:** Hareketli platform, hızlı düşman; Lv2 açılır.
-- **Aşama C – Boss Arena:** Dr. Malignant savaş alanı; kapı kapalıyken arena kilitlenir.
-
-## Boss: Dr. Malignant
-- **Şırınga Atışı:** Zehirli projectile, yavaşlatma/DOT.
-- **Hücre Ezme:** Tavandan petri kabı düşer; gölge ile telegraph.
-- **Zayıf An:** Her pattern sonrası 1–2 sn boyunca hasar alabilir; sağlık azaldıkça hızlanır.
+- Hareket: `A / D` veya `Sol / Sağ`
+- Zıplama: `Space` veya `W`
+- Saldırı: `J`
+- Dash: `Shift` (dashBoost açıldıysa)
+- Kapı Geçişi: `Enter`
 
 ## Kurulum ve Çalıştırma
-1) Bağımlılıkları kur: `npm install`
-2) Geliştirme sunucusu: `npm run dev` (localhost:8080)
-3) Production build: `npm run build` → `dist/`
-4) Telemetri istemiyorsan `dev-nolog` / `build-nolog` kullan veya `log.js` çağrılarını kaldır.
+1. Bağımlılıkları kur:
+   - `pnpm install`
+2. Geliştirme sunucusunu başlat:
+   - `pnpm dev`
+3. Tür kontrolü:
+   - `npx tsc --noEmit`
+4. Production build:
+   - `pnpm build`
 
-## Dizin Yapisi
+## Temel Dizin Yapısı
+
 ```text
 src/
   game/
+    animations/
     config/
-      gameConfig.ts
     constants/
-      assetKeys.ts
-      eventKeys.ts
-      sceneKeys.ts
     data/
-      evolutionData.ts
+      enemyConfigs.ts
+      growthConfig.ts
+      levels.ts
+      shopCatalog.ts
     entities/
+      enemies/
+      level/
       player/
-        Player.ts
+      projectiles/
     scenes/
       BootScene.ts
       PreloadScene.ts
+      IntroScene.ts
+      MainMenuScene.ts
+      LevelSelectScene.ts
+      SettingsScene.ts
       GameScene.ts
       HudScene.ts
-      index.ts
+      LevelCompleteScene.ts
+    services/
     state/
       GameState.ts
-    EventBus.ts
-    main.ts
-  pages/
-    index.tsx
-  App.tsx
-  PhaserGame.tsx
+    systems/
+      EnemyManager.ts
+    types/
 
 public/
   assets/
-    logo.png
     characters/
       1.png
-      2.png
-      3.png
-      4.png
-      5.png
+    enemy/
+    maps/
+  maps/
+    map1.json
+    map2.json
+    map3.json
 ```
 
-- `BootScene` oyun state'ini sifirlar ve preload'a gecer.
-- `PreloadScene` butun assetleri yukler (logo + `characters/1..5.png`).
-- `GameScene` temel platform, oyuncu ve Cell Point toplama dongusunu calistirir.
-- `HudScene` puan ve evrim seviyesini EventBus uzerinden gunceller.
-
-## Teknolojiler
-- Phaser 3.90.0
-- Next.js 15
-- TypeScript 5
-- React 19
-
-## Lisans
-MIT (orijinal template lisansı).
+## Teknik Notlar
+- Eski `evolution` upgrade'i kaldırılmıştır.
+- Eski kayıtta bulunan `evolution` alanı sessizce yok sayılır.
+- Karakter için tek spritesheet kullanılır: `public/assets/characters/1.png`.

@@ -1,7 +1,7 @@
 import { Scene } from "phaser";
 import { EventBus } from "../EventBus";
 import { EVENT_KEYS } from "../constants/eventKeys";
-import { EVOLUTION_STAGES } from "../data/evolutionData";
+import { GROWTH_STAGE_INFO } from "../data/growthConfig";
 import { SCENE_KEYS } from "../constants/sceneKeys";
 import { GameSnapshot } from "../types/progression";
 
@@ -16,13 +16,15 @@ export class HudScene extends Scene {
 
     private infoPanelContainer!: Phaser.GameObjects.Container;
     private infoPanelVisible = false;
-    private infoPointsText!: Phaser.GameObjects.Text;
-    private infoEvolutionText!: Phaser.GameObjects.Text;
-    private infoFormText!: Phaser.GameObjects.Text;
-    private infoFormDescText!: Phaser.GameObjects.Text;
+    private infoGrowthText!: Phaser.GameObjects.Text;
+    private infoGrowthNameText!: Phaser.GameObjects.Text;
+    private infoGrowthDescText!: Phaser.GameObjects.Text;
+    private infoCollectedText!: Phaser.GameObjects.Text;
+    private infoResidualText!: Phaser.GameObjects.Text;
     private infoHpText!: Phaser.GameObjects.Text;
     private infoAtkText!: Phaser.GameObjects.Text;
     private infoSpeedText!: Phaser.GameObjects.Text;
+    private infoDashText!: Phaser.GameObjects.Text;
     private escKey!: Phaser.Input.Keyboard.Key;
     private lastSnapshot: GameSnapshot | null = null;
 
@@ -125,7 +127,7 @@ export class HudScene extends Scene {
     private createInfoPanel(): void {
         const { width, height } = this.scale;
         const panelW = 380;
-        const panelH = 280;
+        const panelH = 338;
         const px = (width - panelW) * 0.5;
         const py = (height - panelH) * 0.5;
 
@@ -158,35 +160,43 @@ export class HudScene extends Scene {
         const rightCol = panelW - 24;
         let rowY = 66;
 
-        const lbl1 = this.make.text({ x: leftCol, y: rowY, text: "Evrim Seviyesi:", style: labelStyle, add: false });
-        this.infoEvolutionText = this.make.text({ x: rightCol, y: rowY, text: "Lv0", style: valueStyle, origin: { x: 1, y: 0 }, add: false });
+        const lbl1 = this.make.text({ x: leftCol, y: rowY, text: "Büyüme Aşaması:", style: labelStyle, add: false });
+        this.infoGrowthText = this.make.text({ x: rightCol, y: rowY, text: "Aşama 0", style: valueStyle, origin: { x: 1, y: 0 }, add: false });
         rowY += 30;
 
-        const lbl2 = this.make.text({ x: leftCol, y: rowY, text: "Form:", style: labelStyle, add: false });
-        this.infoFormText = this.make.text({ x: rightCol, y: rowY, text: "Hücre Formu", style: valueStyle, origin: { x: 1, y: 0 }, add: false });
+        const lbl2 = this.make.text({ x: leftCol, y: rowY, text: "Büyüme Formu:", style: labelStyle, add: false });
+        this.infoGrowthNameText = this.make.text({ x: rightCol, y: rowY, text: "Temel Hücre", style: valueStyle, origin: { x: 1, y: 0 }, add: false });
         rowY += 24;
 
-        this.infoFormDescText = this.make.text({
+        this.infoGrowthDescText = this.make.text({
             x: leftCol, y: rowY, text: "",
             style: { color: "#90d8ff", fontFamily: "Verdana", fontSize: "13px", fontStyle: "italic" },
             add: false
         });
         rowY += 30;
 
-        const lbl3 = this.make.text({ x: leftCol, y: rowY, text: "Bölüm Puanı:", style: labelStyle, add: false });
-        this.infoPointsText = this.make.text({ x: rightCol, y: rowY, text: "0", style: valueStyle, origin: { x: 1, y: 0 }, add: false });
+        const lbl3 = this.make.text({ x: leftCol, y: rowY, text: "Toplanan Hücre:", style: labelStyle, add: false });
+        this.infoCollectedText = this.make.text({ x: rightCol, y: rowY, text: "0", style: valueStyle, origin: { x: 1, y: 0 }, add: false });
         rowY += 30;
 
-        const lbl4 = this.make.text({ x: leftCol, y: rowY, text: "Can:", style: labelStyle, add: false });
+        const lbl4 = this.make.text({ x: leftCol, y: rowY, text: "Artan Hücre:", style: labelStyle, add: false });
+        this.infoResidualText = this.make.text({ x: rightCol, y: rowY, text: "0", style: valueStyle, origin: { x: 1, y: 0 }, add: false });
+        rowY += 30;
+
+        const lbl5 = this.make.text({ x: leftCol, y: rowY, text: "Can:", style: labelStyle, add: false });
         this.infoHpText = this.make.text({ x: rightCol, y: rowY, text: "3/3", style: valueStyle, origin: { x: 1, y: 0 }, add: false });
         rowY += 30;
 
-        const lbl5 = this.make.text({ x: leftCol, y: rowY, text: "Saldırı Gücü:", style: labelStyle, add: false });
+        const lbl6 = this.make.text({ x: leftCol, y: rowY, text: "Saldırı Gücü:", style: labelStyle, add: false });
         this.infoAtkText = this.make.text({ x: rightCol, y: rowY, text: "1", style: valueStyle, origin: { x: 1, y: 0 }, add: false });
         rowY += 30;
 
-        const lbl6 = this.make.text({ x: leftCol, y: rowY, text: "Hareket Hızı:", style: labelStyle, add: false });
+        const lbl7 = this.make.text({ x: leftCol, y: rowY, text: "Hareket Hızı:", style: labelStyle, add: false });
         this.infoSpeedText = this.make.text({ x: rightCol, y: rowY, text: "210", style: valueStyle, origin: { x: 1, y: 0 }, add: false });
+        rowY += 30;
+
+        const lbl8 = this.make.text({ x: leftCol, y: rowY, text: "Atılma (Dash):", style: labelStyle, add: false });
+        this.infoDashText = this.make.text({ x: rightCol, y: rowY, text: "Kapalı", style: valueStyle, origin: { x: 1, y: 0 }, add: false });
 
         const hintText = this.make.text({
             x: panelW * 0.5, y: panelH - 16,
@@ -198,12 +208,14 @@ export class HudScene extends Scene {
 
         this.infoPanelContainer = this.add.container(px, py, [
             bg, titleText, sep,
-            lbl1, this.infoEvolutionText,
-            lbl2, this.infoFormText, this.infoFormDescText,
-            lbl3, this.infoPointsText,
-            lbl4, this.infoHpText,
-            lbl5, this.infoAtkText,
-            lbl6, this.infoSpeedText,
+            lbl1, this.infoGrowthText,
+            lbl2, this.infoGrowthNameText, this.infoGrowthDescText,
+            lbl3, this.infoCollectedText,
+            lbl4, this.infoResidualText,
+            lbl5, this.infoHpText,
+            lbl6, this.infoAtkText,
+            lbl7, this.infoSpeedText,
+            lbl8, this.infoDashText,
             hintText
         ]).setDepth(200).setScrollFactor(0);
 
@@ -236,13 +248,15 @@ export class HudScene extends Scene {
     }
 
     private refreshInfoPanel(snapshot: GameSnapshot): void {
-        const stage = EVOLUTION_STAGES.find((s) => s.level === snapshot.stats.evolutionLevel);
-        this.infoEvolutionText.setText(`Lv${snapshot.stats.evolutionLevel}`);
-        this.infoFormText.setText(stage?.label ?? "Bilinmiyor");
-        this.infoFormDescText.setText(stage?.description ?? "");
-        this.infoPointsText.setText(`${snapshot.run.runPoints}`);
+        const growthInfo = GROWTH_STAGE_INFO.find((stage) => stage.stage === snapshot.run.growthStage);
+        this.infoGrowthText.setText(`Aşama ${snapshot.run.growthStage}`);
+        this.infoGrowthNameText.setText(growthInfo?.label ?? "Temel Hücre");
+        this.infoGrowthDescText.setText(growthInfo?.description ?? "");
+        this.infoCollectedText.setText(`${snapshot.run.collectedCells}`);
+        this.infoResidualText.setText(`${snapshot.run.residualCells}`);
         this.infoHpText.setText(`${snapshot.run.health}/${snapshot.run.maxHealth}`);
         this.infoAtkText.setText(`${snapshot.stats.attackDamage}`);
         this.infoSpeedText.setText(`${snapshot.stats.moveBase}`);
+        this.infoDashText.setText(snapshot.stats.canDash ? "Açık" : "Kapalı");
     }
 }
