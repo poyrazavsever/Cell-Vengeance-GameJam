@@ -1,6 +1,14 @@
 import { Physics, Scene } from "phaser";
-import { EnemyAnimationAction, getEnemyAnimationKey, getEnemyTextureKey } from "../../animations/enemyAnimations";
-import { ASSET_KEYS, ENEMY_SFX_KEYS, EnemySfxAction } from "../../constants/assetKeys";
+import {
+    EnemyAnimationAction,
+    getEnemyAnimationKey,
+    getEnemyTextureKey,
+} from "../../animations/enemyAnimations";
+import {
+    ASSET_KEYS,
+    ENEMY_SFX_KEYS,
+    EnemySfxAction,
+} from "../../constants/assetKeys";
 import { DamageSource, EnemyKind, EnemyState } from "../../types/combat";
 import { AttackHitboxConfig, EnemyConfig } from "../../types/enemy";
 import { Player } from "../player/Player";
@@ -48,9 +56,15 @@ export abstract class EnemyBase extends Physics.Arcade.Sprite {
         y: number,
         patrolMinX: number,
         patrolMaxX: number,
-        deathHandler: EnemyDeathHandler
+        deathHandler: EnemyDeathHandler,
     ) {
-        super(scene, x, y, getEnemyTextureKey(kind), kind === "boss" ? "boss-0" : 0);
+        super(
+            scene,
+            x,
+            y,
+            getEnemyTextureKey(kind),
+            kind === "boss" ? "boss-0" : 0,
+        );
 
         this.kind = kind;
         this.config = config;
@@ -126,7 +140,12 @@ export abstract class EnemyBase extends Physics.Arcade.Sprite {
             return false;
         }
 
-        if (!(this.behaviorState === "patrol" || this.behaviorState === "detect")) {
+        if (
+            !(
+                this.behaviorState === "patrol" ||
+                this.behaviorState === "detect"
+            )
+        ) {
             return false;
         }
 
@@ -150,7 +169,11 @@ export abstract class EnemyBase extends Physics.Arcade.Sprite {
     }
 
     isAttackHitboxActive(): boolean {
-        return this.attackHitboxEnabled && this.attackHitboxBody.enable && this.attackHitbox.active;
+        return (
+            this.attackHitboxEnabled &&
+            this.attackHitboxBody.enable &&
+            this.attackHitbox.active
+        );
     }
 
     getDropCellPoints(): number {
@@ -196,7 +219,11 @@ export abstract class EnemyBase extends Physics.Arcade.Sprite {
         this.onStateChanged(previousState, nextState, time);
     }
 
-    protected onStateChanged(_previousState: EnemyState, _nextState: EnemyState, _time: number): void {
+    protected onStateChanged(
+        _previousState: EnemyState,
+        _nextState: EnemyState,
+        _time: number,
+    ): void {
         // Subclasses can override.
     }
 
@@ -217,7 +244,10 @@ export abstract class EnemyBase extends Physics.Arcade.Sprite {
     }
 
     protected isPlayerInDetectRange(player: Player): boolean {
-        return Phaser.Math.Distance.Between(this.x, this.y, player.x, player.y) <= this.config.detectRange;
+        return (
+            Phaser.Math.Distance.Between(this.x, this.y, player.x, player.y) <=
+            this.config.detectRange
+        );
     }
 
     protected tryFollowPlayerVertical(
@@ -232,7 +262,7 @@ export abstract class EnemyBase extends Physics.Arcade.Sprite {
             minHorizontalGap?: number;
             allowStepJump?: boolean;
             stepJumpAllowance?: number;
-        }
+        },
     ): boolean {
         const body = this.body as Physics.Arcade.Body | null;
         if (!body || this.isDead) {
@@ -259,20 +289,25 @@ export abstract class EnemyBase extends Physics.Arcade.Sprite {
         const verticalGap = this.y - player.y;
         const minVerticalGap = options?.minVerticalGap ?? 20;
         const maxVerticalGap = options?.maxVerticalGap ?? 420;
-        const withinVerticalGap = verticalGap >= minVerticalGap && verticalGap <= maxVerticalGap;
+        const withinVerticalGap =
+            verticalGap >= minVerticalGap && verticalGap <= maxVerticalGap;
 
-        const obstacleAhead = this.facingDirection > 0 ? body.blocked.right : body.blocked.left;
+        const obstacleAhead =
+            this.facingDirection > 0 ? body.blocked.right : body.blocked.left;
         const stepJumpAllowance = options?.stepJumpAllowance ?? 72;
-        const canStepJump = (options?.allowStepJump ?? true)
-            && obstacleAhead
-            && player.y <= this.y + stepJumpAllowance;
+        const canStepJump =
+            (options?.allowStepJump ?? true) &&
+            obstacleAhead &&
+            player.y <= this.y + stepJumpAllowance;
 
         if (!withinVerticalGap && !canStepJump) {
             return false;
         }
 
         const jumpPower = options?.jumpPower ?? 440;
-        const horizontalSpeed = options?.horizontalSpeed ?? ((this.config.chaseSpeed ?? this.config.patrolSpeed) * 1.1);
+        const horizontalSpeed =
+            options?.horizontalSpeed ??
+            (this.config.chaseSpeed ?? this.config.patrolSpeed) * 1.1;
         this.setVelocity(this.facingDirection * horizontalSpeed, -jumpPower);
         this.lastPlatformJumpAt = time;
         this.playEnemySfx("jump", 0.25);
@@ -298,10 +333,15 @@ export abstract class EnemyBase extends Physics.Arcade.Sprite {
         }
     }
 
-    protected enableAttackHitbox(config: AttackHitboxConfig, damage: number, direction = this.facingDirection): void {
+    protected enableAttackHitbox(
+        config: AttackHitboxConfig,
+        damage: number,
+        direction = this.facingDirection,
+    ): void {
         this.attackDirection = direction >= 0 ? 1 : -1;
         this.attackHitboxDamage = damage;
-        this.attackHitboxOffsetX = Math.abs(config.offsetX) * this.attackDirection;
+        this.attackHitboxOffsetX =
+            Math.abs(config.offsetX) * this.attackDirection;
         this.attackHitboxOffsetY = config.offsetY;
         this.attackHitboxBody.setSize(config.width, config.height);
         this.attackHitbox.setSize(config.width, config.height);
@@ -354,12 +394,15 @@ export abstract class EnemyBase extends Physics.Arcade.Sprite {
             onComplete: () => {
                 this.attackHitbox.destroy();
                 this.destroy();
-            }
+            },
         });
     }
 
     private syncAttackHitboxPosition(): void {
-        this.attackHitbox.setPosition(this.x + this.attackHitboxOffsetX, this.y + this.attackHitboxOffsetY);
+        this.attackHitbox.setPosition(
+            this.x + this.attackHitboxOffsetX,
+            this.y + this.attackHitboxOffsetY,
+        );
     }
 
     private spawnDeathBurst(): void {
@@ -367,13 +410,18 @@ export abstract class EnemyBase extends Physics.Arcade.Sprite {
             return;
         }
 
-        const particles = this.scene.add.particles(this.x, this.y, "cell-point", {
-            lifespan: 420,
-            speed: { min: 55, max: 130 },
-            scale: { start: 0.55, end: 0 },
-            quantity: 10,
-            emitting: false
-        });
+        const particles = this.scene.add.particles(
+            this.x,
+            this.y,
+            "cell-point",
+            {
+                lifespan: 420,
+                speed: { min: 55, max: 130 },
+                scale: { start: 0.55, end: 0 },
+                quantity: 10,
+                emitting: false,
+            },
+        );
         particles.explode(10, this.x, this.y);
         this.scene.time.delayedCall(460, () => particles.destroy());
     }
@@ -382,12 +430,22 @@ export abstract class EnemyBase extends Physics.Arcade.Sprite {
         const body = this.body as Physics.Arcade.Body;
         const frameWidth = this.frame.realWidth;
         const frameHeight = this.frame.realHeight;
-        const bodyWidth = this.kind === "boss" ? BOSS_BODY_WIDTH : frameWidth * ENEMY_BODY_WIDTH_RATIO;
-        const bodyHeight = this.kind === "boss" ? BOSS_BODY_HEIGHT : frameHeight * ENEMY_BODY_HEIGHT_RATIO;
+        const bodyWidth =
+            this.kind === "boss"
+                ? BOSS_BODY_WIDTH
+                : frameWidth * ENEMY_BODY_WIDTH_RATIO;
+        const bodyHeight =
+            this.kind === "boss"
+                ? BOSS_BODY_HEIGHT
+                : frameHeight * ENEMY_BODY_HEIGHT_RATIO;
         const offsetX = (frameWidth - bodyWidth) * 0.5;
-        const offsetY = frameHeight - bodyHeight - frameHeight * ENEMY_BODY_BOTTOM_TRIM_RATIO;
+        const offsetY =
+            frameHeight -
+            bodyHeight -
+            frameHeight * ENEMY_BODY_BOTTOM_TRIM_RATIO;
 
         body.setSize(bodyWidth, bodyHeight);
         body.setOffset(offsetX, offsetY);
     }
 }
+
