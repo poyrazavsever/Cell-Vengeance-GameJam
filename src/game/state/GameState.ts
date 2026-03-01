@@ -297,9 +297,9 @@ export class GameState {
         return {
             maxHealth: 3 + this.profile.upgrades.maxHp,
             attackDamage: 1 + this.profile.upgrades.attack,
-            moveBase: 210 + this.profile.upgrades.moveSpeed * 20,
-            jumpPower: 560 + this.profile.upgrades.jumpPower * 25,
-            dashBonus: 120 + this.profile.upgrades.dashBoost * 25,
+            moveBase: 170 + this.profile.upgrades.moveSpeed * 15,
+            jumpPower: 500 + this.profile.upgrades.jumpPower * 20,
+            dashBonus: 80 + this.profile.upgrades.dashBoost * 15,
             canDash: this.profile.upgrades.dashBoost > 0
         };
     }

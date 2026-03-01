@@ -274,7 +274,7 @@ export abstract class EnemyBase extends Physics.Arcade.Sprite {
             alpha: 0,
             scaleX: this.scaleX * 0.72,
             scaleY: this.scaleY * 0.72,
-            duration: 320,
+            duration: 520,
             onComplete: () => {
                 this.attackHitbox.destroy();
                 this.destroy();
@@ -291,15 +291,15 @@ export abstract class EnemyBase extends Physics.Arcade.Sprite {
             return;
         }
 
-        const particles = this.scene.add.particles(this.x, this.y, ASSET_KEYS.CELL_POINT, {
-            lifespan: 260,
-            speed: { min: 80, max: 180 },
+        const particles = this.scene.add.particles(this.x, this.y, "cell-point", {
+            lifespan: 420,
+            speed: { min: 55, max: 130 },
             scale: { start: 0.55, end: 0 },
             quantity: 10,
             emitting: false
         });
         particles.explode(10, this.x, this.y);
-        this.scene.time.delayedCall(280, () => particles.destroy());
+        this.scene.time.delayedCall(460, () => particles.destroy());
     }
 
     private refreshBodySize(): void {

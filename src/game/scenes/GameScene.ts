@@ -56,14 +56,14 @@ interface MapTileLookupEntry {
 
 type MapTileLookup = Record<string, MapTileLookupEntry>;
 
-const PLAYER_ATTACK_DURATION_MS = 140;
+const PLAYER_ATTACK_DURATION_MS = 160;
 const WORLD_HEIGHT = 800;
 const CAMERA_ZOOM = 1.45;
 const MAP_LAYER_NAMES = {
     background: ["Arkaplan"],
-    upper: ["Üst katman"],
-    upperPlus: ["Üst+ katman"],
-    solid: ["Ana katman", "Tile Layer 3"],
+    mid: ["Arkaplan Onu", "Arkaplan Önü", "Arkaplan Objeler", "Üst katman"],
+    midPlus: ["Üst+ katman"],
+    solid: ["Ana katman", "Ana Katman", "Tile Layer 3"],
     ladder: ["Merdiven"]
 } as const;
 
@@ -294,9 +294,10 @@ export class GameScene extends Scene {
         this.physics.world.setBounds(0, 0, worldWidth, worldHeight);
         this.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
 
+        // Render order (back -> front): background, mid-background objects, solid, ladders.
         this.drawMapLayer(mapData, MAP_LAYER_NAMES.background, tileLookup, -40, 0x143b55, 0.28);
-        this.drawMapLayer(mapData, MAP_LAYER_NAMES.upper, tileLookup, -30, 0x2a6288, 0.36);
-        this.drawMapLayer(mapData, MAP_LAYER_NAMES.upperPlus, tileLookup, -20, 0x4b88a5, 0.44);
+        this.drawMapLayer(mapData, MAP_LAYER_NAMES.mid, tileLookup, -30, 0x2a6288, 0.36);
+        this.drawMapLayer(mapData, MAP_LAYER_NAMES.midPlus, tileLookup, -20, 0x4b88a5, 0.44);
         this.drawMapLayer(mapData, MAP_LAYER_NAMES.solid, tileLookup, -8, 0x2d5f7b, 0.7);
         this.drawMapLayer(mapData, MAP_LAYER_NAMES.ladder, tileLookup, 8, 0x8bd3ff, 0.6);
 
@@ -444,14 +445,25 @@ export class GameScene extends Scene {
     }
 
     private getFirstMapLayerByNames(mapData: TiledMapData, layerNames: readonly string[]): TiledLayerData | null {
-        for (const layerName of layerNames) {
-            const found = mapData.layers.find((candidate) => candidate.type === "tilelayer" && candidate.name === layerName);
+        const normalizedNames = layerNames.map((name) => this.normalizeLayerName(name));
+        for (const normalizedLayerName of normalizedNames) {
+            const found = mapData.layers.find((candidate) => {
+                if (candidate.type !== "tilelayer") {
+                    return false;
+                }
+
+                return this.normalizeLayerName(candidate.name) === normalizedLayerName;
+            });
             if (found?.data) {
                 return found;
             }
         }
 
         return null;
+    }
+
+    private normalizeLayerName(name: string): string {
+        return name.trim().toLocaleLowerCase("tr-TR");
     }
 
     private createCollisionFromLayer(layer: TiledLayerData, tileWidth: number, tileHeight: number): void {
@@ -795,7 +807,7 @@ export class GameScene extends Scene {
     }
 
     private triggerPlayerAttack(): void {
-        this.player.playLockedAction("attack", 320);
+        this.player.playLockedAction("attack", 380);
         this.playSfxOnce(ASSET_KEYS.SFX_PLAYER_ATTACK, 0.35);
 
         this.playerAttackActive = true;
@@ -1032,9 +1044,10 @@ export class GameScene extends Scene {
 
     private configureCamera(): void {
         this.cameras.main.setZoom(CAMERA_ZOOM);
-        this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
-        this.cameras.main.setDeadzone(360, 320);
-        this.cameras.main.setFollowOffset(-180, 0);
+        // Keep the player centered and avoid camera lag when direction changes quickly.
+        this.cameras.main.startFollow(this.player, true, 1, 1);
+        this.cameras.main.setDeadzone(0, 0);
+        this.cameras.main.setFollowOffset(0, 0);
     }
 
     private ensureHudScene(): void {

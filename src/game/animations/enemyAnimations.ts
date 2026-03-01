@@ -17,10 +17,10 @@ const ENEMY_TEXTURE_BY_KIND: Record<EnemyKind, string> = {
 };
 
 const ENEMY_FRAME_RANGES: Record<EnemyAnimationAction, { start: number; end: number; frameRate: number; repeat: number }> = {
-    patrol: { start: 0, end: 3, frameRate: 10, repeat: -1 },
-    detect: { start: 4, end: 7, frameRate: 11, repeat: 0 },
-    attack: { start: 8, end: 11, frameRate: 14, repeat: 0 },
-    recover: { start: 12, end: 13, frameRate: 10, repeat: -1 },
+    patrol: { start: 0, end: 3, frameRate: 8, repeat: -1 },
+    detect: { start: 4, end: 7, frameRate: 9, repeat: 0 },
+    attack: { start: 8, end: 11, frameRate: 11, repeat: 0 },
+    recover: { start: 12, end: 13, frameRate: 8, repeat: -1 },
     hit: { start: 14, end: 14, frameRate: 1, repeat: 0 },
     death: { start: 15, end: 15, frameRate: 1, repeat: 0 }
 };
