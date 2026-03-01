@@ -11,6 +11,9 @@ const ENEMY_BASE_SCALE = 0.42;
 const ENEMY_BODY_WIDTH_RATIO = 0.56;
 const ENEMY_BODY_HEIGHT_RATIO = 0.66;
 const ENEMY_BODY_BOTTOM_TRIM_RATIO = 0.07;
+const BOSS_TARGET_DISPLAY_HEIGHT = 84;
+const BOSS_BODY_WIDTH = 64;
+const BOSS_BODY_HEIGHT = 86;
 
 export abstract class EnemyBase extends Physics.Arcade.Sprite {
     readonly kind: EnemyKind;
@@ -33,6 +36,7 @@ export abstract class EnemyBase extends Physics.Arcade.Sprite {
     private attackHitboxDamage = 0;
     private attackHitboxEnabled = false;
     private nextContactDamageAt = 0;
+    private lastPlatformJumpAt = -Infinity;
     private deathHandler: EnemyDeathHandler | null;
     private isDead = false;
 
@@ -46,7 +50,7 @@ export abstract class EnemyBase extends Physics.Arcade.Sprite {
         patrolMaxX: number,
         deathHandler: EnemyDeathHandler
     ) {
-        super(scene, x, y, getEnemyTextureKey(kind), 0);
+        super(scene, x, y, getEnemyTextureKey(kind), kind === "boss" ? "boss-0" : 0);
 
         this.kind = kind;
         this.config = config;
@@ -60,7 +64,12 @@ export abstract class EnemyBase extends Physics.Arcade.Sprite {
         scene.add.existing(this);
         scene.physics.add.existing(this);
 
-        this.setScale(ENEMY_BASE_SCALE);
+        if (kind === "boss") {
+            const safeFrameHeight = Math.max(1, this.frame.realHeight);
+            this.setScale(BOSS_TARGET_DISPLAY_HEIGHT / safeFrameHeight);
+        } else {
+            this.setScale(ENEMY_BASE_SCALE);
+        }
         this.setCollideWorldBounds(true);
         this.setBounce(0);
         this.refreshBodySize();
@@ -148,6 +157,14 @@ export abstract class EnemyBase extends Physics.Arcade.Sprite {
         return this.config.dropCellPoints;
     }
 
+    getHealth(): number {
+        return this.health;
+    }
+
+    getMaxHealth(): number {
+        return this.config.maxHealth;
+    }
+
     isAlive(): boolean {
         return !this.isDead;
     }
@@ -201,6 +218,65 @@ export abstract class EnemyBase extends Physics.Arcade.Sprite {
 
     protected isPlayerInDetectRange(player: Player): boolean {
         return Phaser.Math.Distance.Between(this.x, this.y, player.x, player.y) <= this.config.detectRange;
+    }
+
+    protected tryFollowPlayerVertical(
+        player: Player,
+        time: number,
+        options?: {
+            cooldownMs?: number;
+            jumpPower?: number;
+            minVerticalGap?: number;
+            maxVerticalGap?: number;
+            horizontalSpeed?: number;
+            minHorizontalGap?: number;
+            allowStepJump?: boolean;
+            stepJumpAllowance?: number;
+        }
+    ): boolean {
+        const body = this.body as Physics.Arcade.Body | null;
+        if (!body || this.isDead) {
+            return false;
+        }
+
+        const isGrounded = Boolean(body.blocked.down || body.touching.down);
+        if (!isGrounded) {
+            return false;
+        }
+
+        const cooldownMs = options?.cooldownMs ?? 850;
+        if (time < this.lastPlatformJumpAt + cooldownMs) {
+            return false;
+        }
+
+        this.faceTowards(player.x);
+        const horizontalGap = player.x - this.x;
+        const minHorizontalGap = options?.minHorizontalGap ?? 14;
+        if (Math.abs(horizontalGap) < minHorizontalGap) {
+            return false;
+        }
+
+        const verticalGap = this.y - player.y;
+        const minVerticalGap = options?.minVerticalGap ?? 20;
+        const maxVerticalGap = options?.maxVerticalGap ?? 420;
+        const withinVerticalGap = verticalGap >= minVerticalGap && verticalGap <= maxVerticalGap;
+
+        const obstacleAhead = this.facingDirection > 0 ? body.blocked.right : body.blocked.left;
+        const stepJumpAllowance = options?.stepJumpAllowance ?? 72;
+        const canStepJump = (options?.allowStepJump ?? true)
+            && obstacleAhead
+            && player.y <= this.y + stepJumpAllowance;
+
+        if (!withinVerticalGap && !canStepJump) {
+            return false;
+        }
+
+        const jumpPower = options?.jumpPower ?? 440;
+        const horizontalSpeed = options?.horizontalSpeed ?? ((this.config.chaseSpeed ?? this.config.patrolSpeed) * 1.1);
+        this.setVelocity(this.facingDirection * horizontalSpeed, -jumpPower);
+        this.lastPlatformJumpAt = time;
+        this.playEnemySfx("jump", 0.25);
+        return true;
     }
 
     protected playEnemySfx(action: EnemySfxAction, volume = 0.3): void {
@@ -306,8 +382,8 @@ export abstract class EnemyBase extends Physics.Arcade.Sprite {
         const body = this.body as Physics.Arcade.Body;
         const frameWidth = this.frame.realWidth;
         const frameHeight = this.frame.realHeight;
-        const bodyWidth = frameWidth * ENEMY_BODY_WIDTH_RATIO;
-        const bodyHeight = frameHeight * ENEMY_BODY_HEIGHT_RATIO;
+        const bodyWidth = this.kind === "boss" ? BOSS_BODY_WIDTH : frameWidth * ENEMY_BODY_WIDTH_RATIO;
+        const bodyHeight = this.kind === "boss" ? BOSS_BODY_HEIGHT : frameHeight * ENEMY_BODY_HEIGHT_RATIO;
         const offsetX = (frameWidth - bodyWidth) * 0.5;
         const offsetY = frameHeight - bodyHeight - frameHeight * ENEMY_BODY_BOTTOM_TRIM_RATIO;
 

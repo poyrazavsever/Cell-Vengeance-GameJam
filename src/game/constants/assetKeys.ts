@@ -6,11 +6,13 @@ export const ASSET_KEYS = {
     MAP_LEVEL_1: "map-level-1",
     MAP_LEVEL_2: "map-level-2",
     MAP_LEVEL_3: "map-level-3",
+    MAP_BOSS: "map-boss",
     CELL_POINT: "cell-point-img",
     PLAYER_LEVEL_1: "player-level-1",
     ENEMY_SCOUT: "enemy-scout",
     ENEMY_SPITTER: "enemy-spitter",
     ENEMY_BRUTE: "enemy-brute",
+    ENEMY_BOSS: "enemy-boss",
     BGM_MENU: "bgm-menu",
     SFX_PLAYER_WALK: "sfx-player-walk",
     SFX_PLAYER_JUMP: "sfx-player-jump",
@@ -27,7 +29,13 @@ export const ASSET_KEYS = {
     SFX_BRUTE_WALK: "sfx-brute-walk",
     SFX_BRUTE_JUMP: "sfx-brute-jump",
     SFX_BRUTE_ATTACK: "sfx-brute-attack",
-    SFX_BRUTE_HIT: "sfx-brute-hit"
+    SFX_BRUTE_HIT: "sfx-brute-hit",
+    SFX_BOSS_WALK: "sfx-boss-walk",
+    SFX_BOSS_JUMP: "sfx-boss-jump",
+    SFX_BOSS_ATTACK: "sfx-boss-attack",
+    SFX_BOSS_HIT: "sfx-boss-hit",
+    SFX_BOSS_SCREAM: "sfx-boss-scream",
+    SFX_BOSS_DAMAGE: "sfx-boss-damage"
 } as const;
 
 export type EnemySfxAction = "walk" | "jump" | "attack" | "hit";
@@ -50,6 +58,12 @@ export const ENEMY_SFX_KEYS: Record<string, Record<EnemySfxAction, string>> = {
         jump: ASSET_KEYS.SFX_BRUTE_JUMP,
         attack: ASSET_KEYS.SFX_BRUTE_ATTACK,
         hit: ASSET_KEYS.SFX_BRUTE_HIT
+    },
+    boss: {
+        walk: ASSET_KEYS.SFX_BOSS_WALK,
+        jump: ASSET_KEYS.SFX_BOSS_JUMP,
+        attack: ASSET_KEYS.SFX_BOSS_ATTACK,
+        hit: ASSET_KEYS.SFX_BOSS_HIT
     }
 };
 

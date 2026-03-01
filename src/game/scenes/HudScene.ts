@@ -28,6 +28,10 @@ export class HudScene extends Scene {
     private infoDashText!: Phaser.GameObjects.Text;
     private escKey!: Phaser.Input.Keyboard.Key;
     private lastSnapshot: GameSnapshot | null = null;
+    private bossBarContainer!: Phaser.GameObjects.Container;
+    private bossBarFill!: Phaser.GameObjects.Rectangle;
+    private bossBarValueText!: Phaser.GameObjects.Text;
+    private bossBarVisible = false;
 
     constructor() {
         super(SCENE_KEYS.HUD);
@@ -56,6 +60,8 @@ export class HudScene extends Scene {
             strokeThickness: 3
         }).setScrollFactor(0).setDepth(100);
 
+        this.createBossBar();
+
         // --- Info Panel (Pause overlay) ---
         this.createInfoPanel();
 
@@ -68,8 +74,14 @@ export class HudScene extends Scene {
         this.showInfoPanel();
 
         EventBus.on(EVENT_KEYS.PLAYER_PROGRESS_UPDATED, this.handleProgressUpdated, this);
+        EventBus.on(EVENT_KEYS.BOSS_FIGHT_STARTED, this.handleBossFightStarted, this);
+        EventBus.on(EVENT_KEYS.BOSS_HEALTH_UPDATED, this.handleBossHealthUpdated, this);
+        EventBus.on(EVENT_KEYS.BOSS_DEFEATED, this.handleBossDefeated, this);
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
             EventBus.off(EVENT_KEYS.PLAYER_PROGRESS_UPDATED, this.handleProgressUpdated, this);
+            EventBus.off(EVENT_KEYS.BOSS_FIGHT_STARTED, this.handleBossFightStarted, this);
+            EventBus.off(EVENT_KEYS.BOSS_HEALTH_UPDATED, this.handleBossHealthUpdated, this);
+            EventBus.off(EVENT_KEYS.BOSS_DEFEATED, this.handleBossDefeated, this);
         });
 
         // Initialize HUD with current state immediately
@@ -275,6 +287,40 @@ export class HudScene extends Scene {
         this.infoPanelContainer.setVisible(false);
     }
 
+    private createBossBar(): void {
+        const { width } = this.scale;
+        const barWidth = 360;
+        const barHeight = 18;
+        const x = width * 0.5;
+        const y = 34;
+
+        const bg = this.add.rectangle(0, 0, barWidth + 10, barHeight + 10, 0x07131d, 0.88)
+            .setStrokeStyle(2, 0x7fdcff, 0.75);
+        const fillBg = this.add.rectangle(0, 0, barWidth, barHeight, 0x1c2f3d, 0.95).setOrigin(0.5);
+        this.bossBarFill = this.add.rectangle(-barWidth * 0.5, 0, barWidth, barHeight, 0xff5574, 1).setOrigin(0, 0.5);
+        const title = this.add.text(0, -20, "BOSS", {
+            fontFamily: "Verdana",
+            fontSize: "14px",
+            color: "#ffd1d8",
+            fontStyle: "bold",
+            stroke: "#041822",
+            strokeThickness: 3
+        }).setOrigin(0.5);
+        this.bossBarValueText = this.add.text(0, 0, "0/0", {
+            fontFamily: "Verdana",
+            fontSize: "12px",
+            color: "#ffeef1",
+            fontStyle: "bold",
+            stroke: "#041822",
+            strokeThickness: 3
+        }).setOrigin(0.5);
+
+        this.bossBarContainer = this.add.container(x, y, [bg, fillBg, this.bossBarFill, title, this.bossBarValueText])
+            .setScrollFactor(0)
+            .setDepth(130)
+            .setVisible(false);
+    }
+
     private showInfoPanel(): void {
         this.infoPanelVisible = true;
         if (this.lastSnapshot) {
@@ -321,5 +367,44 @@ export class HudScene extends Scene {
         this.infoAtkText.setText(`${snapshot.stats.attackDamage}`);
         this.infoSpeedText.setText(`${snapshot.stats.moveBase}`);
         this.infoDashText.setText(snapshot.stats.canDash ? "Açık" : "Kapalı");
+    }
+
+    private handleBossFightStarted(payload: { currentHealth: number; maxHealth: number }): void {
+        this.bossBarVisible = true;
+        this.bossBarContainer.setVisible(true).setAlpha(1);
+        this.applyBossHealth(payload.currentHealth, payload.maxHealth);
+    }
+
+    private handleBossHealthUpdated(payload: { currentHealth: number; maxHealth: number }): void {
+        if (!this.bossBarVisible) {
+            this.bossBarVisible = true;
+            this.bossBarContainer.setVisible(true).setAlpha(1);
+        }
+        this.applyBossHealth(payload.currentHealth, payload.maxHealth);
+    }
+
+    private handleBossDefeated(): void {
+        if (!this.bossBarVisible) {
+            return;
+        }
+
+        this.bossBarVisible = false;
+        this.tweens.add({
+            targets: this.bossBarContainer,
+            alpha: 0,
+            duration: 250,
+            onComplete: () => {
+                this.bossBarContainer.setVisible(false);
+            }
+        });
+    }
+
+    private applyBossHealth(currentHealth: number, maxHealth: number): void {
+        const barWidth = 360;
+        const safeMax = Math.max(1, maxHealth);
+        const safeCurrent = Phaser.Math.Clamp(currentHealth, 0, safeMax);
+        const ratio = safeCurrent / safeMax;
+        this.bossBarFill.width = barWidth * ratio;
+        this.bossBarValueText.setText(`${safeCurrent}/${safeMax}`);
     }
 }

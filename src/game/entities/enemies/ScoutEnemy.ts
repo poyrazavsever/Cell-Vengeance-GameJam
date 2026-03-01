@@ -35,10 +35,29 @@ export class ScoutEnemy extends EnemyBase {
             case "detect": {
                 this.playAnimation("detect");
                 this.faceTowards(player.x);
+                const jumped = this.tryFollowPlayerVertical(player, time, {
+                    cooldownMs: 700,
+                    jumpPower: 480,
+                    minVerticalGap: 16,
+                    maxVerticalGap: 560,
+                    horizontalSpeed: this.config.chaseSpeed ?? this.config.patrolSpeed
+                });
+                if (jumped) {
+                    break;
+                }
+
                 const chaseDirection = player.x >= this.x ? 1 : -1;
                 this.setVelocityX(chaseDirection * (this.config.chaseSpeed ?? this.config.patrolSpeed));
                 const closeEnough = Math.abs(player.x - this.x) <= 70;
-                if (closeEnough || this.getStateElapsed(time) >= 360) {
+                const closeVertical = Math.abs(player.y - this.y) <= 78;
+                const body = this.body as Phaser.Physics.Arcade.Body;
+                const onGround = Boolean(body.blocked.down || body.touching.down);
+                if (onGround && closeEnough && closeVertical) {
+                    this.setBehaviorState("telegraph", time);
+                    break;
+                }
+
+                if (onGround && this.getStateElapsed(time) >= 920 && closeVertical) {
                     this.setBehaviorState("telegraph", time);
                 }
                 break;

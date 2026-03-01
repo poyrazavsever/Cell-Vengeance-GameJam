@@ -30,9 +30,27 @@ export class BruteEnemy extends EnemyBase {
 
             case "detect":
                 this.playAnimation("detect");
-                this.setVelocityX(0);
                 this.faceTowards(player.x);
-                if (this.getStateElapsed(time) >= 260) {
+                this.setVelocityX(this.facingDirection * (this.config.chaseSpeed ?? this.config.patrolSpeed));
+                this.tryFollowPlayerVertical(player, time, {
+                    cooldownMs: 980,
+                    jumpPower: 430,
+                    minVerticalGap: 18,
+                    maxVerticalGap: 560,
+                    horizontalSpeed: (this.config.chaseSpeed ?? this.config.patrolSpeed) * 1.2
+                });
+
+                const closeEnough = Math.abs(player.x - this.x) <= 110;
+                const closeVertical = Math.abs(player.y - this.y) <= 88;
+                const body = this.body as Phaser.Physics.Arcade.Body;
+                const onGround = Boolean(body.blocked.down || body.touching.down);
+
+                if (onGround && closeEnough && closeVertical) {
+                    this.setBehaviorState("telegraph", time);
+                    break;
+                }
+
+                if (onGround && this.getStateElapsed(time) >= 1150 && closeVertical) {
                     this.setBehaviorState("telegraph", time);
                 }
                 break;

@@ -26,6 +26,10 @@ export class LevelDoor {
         this.glow.setVisible(false);
     }
 
+    isOpenDoor(): boolean {
+        return this.isOpen;
+    }
+
     isPlayerInside(playerBounds: Phaser.Geom.Rectangle): boolean {
         if (!this.isOpen) {
             return false;
@@ -37,7 +41,7 @@ export class LevelDoor {
 
     getInteractionBounds(): Phaser.Geom.Rectangle {
         const doorBounds = this.core.getBounds();
-        return Phaser.Geom.Rectangle.Inflate(doorBounds, 24, 16);
+        return Phaser.Geom.Rectangle.Inflate(doorBounds, 36, 24);
     }
 
     destroy(): void {

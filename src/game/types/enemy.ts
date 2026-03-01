@@ -27,6 +27,14 @@ export interface EnemyConfig {
     burstShots?: number;
     burstIntervalMs?: number;
     burstStartDelayMs?: number;
+    meleeRange?: number;
+    specialMinRange?: number;
+    specialMaxRange?: number;
+    specialCooldownMs?: number;
+    summonCooldownMs?: number;
+    summonMaxAlive?: number;
+    jumpCooldownMs?: number;
+    jumpPower?: number;
     wobbleSpeed?: number;
     wobbleAmplitude?: number;
     vulnerableOnlyInRecover?: boolean;

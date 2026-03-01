@@ -29,7 +29,7 @@ const TSX_CACHE_KEYS: Record<string, string> = {
     "objects.tsx": "map1-tsx-objects"
 };
 
-const MAP_ASSET_KEYS = [ASSET_KEYS.MAP_LEVEL_1, ASSET_KEYS.MAP_LEVEL_2, ASSET_KEYS.MAP_LEVEL_3] as const;
+const MAP_ASSET_KEYS = [ASSET_KEYS.MAP_LEVEL_1, ASSET_KEYS.MAP_LEVEL_2, ASSET_KEYS.MAP_LEVEL_3, ASSET_KEYS.MAP_BOSS] as const;
 
 export class PreloadScene extends Scene {
     private loadingBar!: Phaser.GameObjects.Graphics;
@@ -61,6 +61,7 @@ export class PreloadScene extends Scene {
         this.load.tilemapTiledJSON(ASSET_KEYS.MAP_LEVEL_1, "maps/map1.json");
         this.load.tilemapTiledJSON(ASSET_KEYS.MAP_LEVEL_2, "maps/map2.json");
         this.load.tilemapTiledJSON(ASSET_KEYS.MAP_LEVEL_3, "maps/map3.json");
+        this.load.tilemapTiledJSON(ASSET_KEYS.MAP_BOSS, "maps/bos.json");
         this.load.text(TSX_CACHE_KEYS["background.tsx"], "maps/background.tsx");
         this.load.text(TSX_CACHE_KEYS["tiles.tsx"], "maps/tiles.tsx");
         this.load.text(TSX_CACHE_KEYS["objects.tsx"], "maps/objects.tsx");
@@ -69,6 +70,9 @@ export class PreloadScene extends Scene {
         this.load.spritesheet(ASSET_KEYS.ENEMY_SCOUT, "assets/enemy/Scout.png", { frameWidth: ENEMY_FRAME_SIZE, frameHeight: ENEMY_FRAME_SIZE });
         this.load.spritesheet(ASSET_KEYS.ENEMY_SPITTER, "assets/enemy/Spitter.png", { frameWidth: ENEMY_FRAME_SIZE, frameHeight: ENEMY_FRAME_SIZE });
         this.load.spritesheet(ASSET_KEYS.ENEMY_BRUTE, "assets/enemy/Brute.png", { frameWidth: ENEMY_FRAME_SIZE, frameHeight: ENEMY_FRAME_SIZE });
+        // Boss sheet can be re-exported with different pixel dimensions.
+        // Load as image and split to 6x6 frames at runtime.
+        this.load.image(ASSET_KEYS.ENEMY_BOSS, "assets/enemy/bossNew.png");
         this.load.audio(ASSET_KEYS.BGM_MENU, "sound/bg.mp3");
         this.load.audio(ASSET_KEYS.SFX_PLAYER_WALK, "sound/mainCharacter/walking.mp3");
         this.load.audio(ASSET_KEYS.SFX_PLAYER_JUMP, "sound/mainCharacter/jump.mp3");
@@ -86,6 +90,12 @@ export class PreloadScene extends Scene {
         this.load.audio(ASSET_KEYS.SFX_BRUTE_JUMP, "sound/brute/jump.mp3");
         this.load.audio(ASSET_KEYS.SFX_BRUTE_ATTACK, "sound/brute/attack.mp3");
         this.load.audio(ASSET_KEYS.SFX_BRUTE_HIT, "sound/brute/hit.mp3");
+        this.load.audio(ASSET_KEYS.SFX_BOSS_WALK, "sound/boss/walking.mp3");
+        this.load.audio(ASSET_KEYS.SFX_BOSS_JUMP, "sound/boss/jamping.mp3");
+        this.load.audio(ASSET_KEYS.SFX_BOSS_ATTACK, "sound/boss/shot.mp3");
+        this.load.audio(ASSET_KEYS.SFX_BOSS_HIT, "sound/boss/hit.mp3");
+        this.load.audio(ASSET_KEYS.SFX_BOSS_SCREAM, "sound/boss/scream.mp3");
+        this.load.audio(ASSET_KEYS.SFX_BOSS_DAMAGE, "sound/boss/damage.mp3");
     }
 
     create(): void {

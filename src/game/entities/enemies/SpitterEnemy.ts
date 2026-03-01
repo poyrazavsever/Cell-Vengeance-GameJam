@@ -36,15 +36,20 @@ export class SpitterEnemy extends EnemyBase {
         this.shootProjectile = shootProjectile;
     }
 
-    handleBehavior(player: Player, time: number, delta: number): void {
+    handleBehavior(player: Player, time: number, _delta: number): void {
         switch (this.getState()) {
             case "patrol": {
                 this.playAnimation("patrol");
                 this.faceTowards(player.x);
-                const wobbleStep = (this.config.wobbleSpeed ?? 0.004) * delta;
-                const wobble = Math.sin((time + this.y * 3.2) * wobbleStep) * (this.config.wobbleAmplitude ?? 12);
-                this.setVelocityX(0);
-                this.setPosition(this.spawnX + wobble, this.spawnY);
+                const chaseDirection = player.x >= this.x ? 1 : -1;
+                this.setVelocityX(chaseDirection * this.config.patrolSpeed);
+                this.tryFollowPlayerVertical(player, time, {
+                    cooldownMs: 900,
+                    jumpPower: 430,
+                    minVerticalGap: 16,
+                    maxVerticalGap: 520,
+                    horizontalSpeed: this.config.patrolSpeed * 1.5
+                });
                 if (this.isPlayerInDetectRange(player)) {
                     this.setBehaviorState("detect", time);
                 }
@@ -54,7 +59,14 @@ export class SpitterEnemy extends EnemyBase {
             case "detect":
                 this.playAnimation("detect");
                 this.faceTowards(player.x);
-                this.setVelocityX(0);
+                this.setVelocityX(this.facingDirection * Math.max(16, this.config.patrolSpeed * 0.75));
+                this.tryFollowPlayerVertical(player, time, {
+                    cooldownMs: 900,
+                    jumpPower: 430,
+                    minVerticalGap: 16,
+                    maxVerticalGap: 520,
+                    horizontalSpeed: this.config.patrolSpeed * 1.4
+                });
                 if (this.getStateElapsed(time) >= 250) {
                     this.setBehaviorState("telegraph", time);
                 }

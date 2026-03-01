@@ -45,11 +45,11 @@ const clampLevelId = (value: number): LevelId => {
         return 1;
     }
 
-    if (value >= 3) {
-        return 3;
+    if (value >= 4) {
+        return 4;
     }
 
-    return 2;
+    return Math.floor(value) as LevelId;
 };
 
 const clampUpgradeLevel = (key: UpgradeKey, value: number): number => {
@@ -318,6 +318,10 @@ export class GameState {
     }
 
     canPlayLevel(levelId: LevelId): boolean {
+        if (levelId === 4) {
+            return true;
+        }
+
         if (this.profile.finaleSeen) {
             return true;
         }
@@ -347,7 +351,10 @@ export class GameState {
         const selectedLevel = clampLevelId(Number(source.selectedLevel ?? 1));
         const finaleSeen = Boolean(source.finaleSeen);
         const introSeen = Boolean((source as { introSeen?: unknown }).introSeen);
-        const safeSelectedLevel = !finaleSeen && selectedLevel > unlockedLevel ? unlockedLevel : selectedLevel;
+        const safeSelectedLevel =
+            !finaleSeen && selectedLevel > unlockedLevel && selectedLevel !== 4
+                ? unlockedLevel
+                : selectedLevel;
 
         return {
             unlockedLevel,

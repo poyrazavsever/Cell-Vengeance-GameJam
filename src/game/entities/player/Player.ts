@@ -90,7 +90,15 @@ export class Player extends Physics.Arcade.Sprite {
     }
 
     setGrowthStage(stage: GrowthStage): void {
+        if (!this.active || !this.scene?.sys?.isActive()) {
+            return;
+        }
+
         this.growthStage = stage;
+        if (!this.scene.textures.exists(ASSET_KEYS.PLAYER_LEVEL_1)) {
+            return;
+        }
+
         this.setTexture(ASSET_KEYS.PLAYER_LEVEL_1, 0);
         this.refreshVisual();
         this.playAction(this.currentAction, true);

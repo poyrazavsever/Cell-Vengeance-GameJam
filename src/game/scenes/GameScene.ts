@@ -17,6 +17,7 @@ import { DamageSource } from "../types/combat";
 import { SpawnPoint } from "../types/enemy";
 import { LevelDefinition } from "../types/level";
 import { LevelId } from "../types/progression";
+import { createMenuButton, createMenuCard, createMenuLabel } from "../ui/menuTheme";
 
 interface MovementKeys extends Phaser.Types.Input.Keyboard.CursorKeys {
     leftAlt: Phaser.Input.Keyboard.Key;
@@ -59,15 +60,20 @@ type MapTileLookup = Record<string, MapTileLookupEntry>;
 const PLAYER_ATTACK_DURATION_MS = 160;
 const WORLD_HEIGHT = 800;
 const CAMERA_ZOOM = 1.45;
-const DOOR_BUFFER_MS = 180;
+const DOOR_BUFFER_MS = 260;
 const FALL_DAMAGE_THRESHOLD_Y = 760;
 const FALL_DAMAGE_AMOUNT = 1;
 const FALL_DAMAGE_LANDING_LOCK_MS = 160;
 const GROWTH_FREEZE_MS = 250;
 const GROWTH_SLOWMO_MS = 1100;
+const DEATH_ANIMATION_MS = 1450;
+const DEATH_ANIM_TIME_SCALE = 0.55;
 const PICKUP_COLLECT_DELAY_MS = 320;
+const PLAYER_SPAWN_Y_OFFSET = 180;
+const ENEMY_SPAWN_UP_TILES = 10;
 const MAP_LAYER_NAMES = {
     background: ["Arkaplan"],
+    backgroundPaint: ["Arkaplan Boya"],
     mid: ["Arkaplan Onu", "Arkaplan Önü", "Arkaplan Objeler", "Üst katman"],
     midPlus: ["Üst+ katman"],
     solid: ["Ana katman", "Ana Katman", "Tile Layer 3"],
@@ -108,6 +114,11 @@ export class GameScene extends Scene {
     private peakFallVelocity = 0;
     private lastFallDamageAt = -Infinity;
     private isGrowthCinematicActive = false;
+    private isDeathSequenceActive = false;
+    private deathUiObjects: Phaser.GameObjects.GameObject[] = [];
+    private bossEnemy: EnemyBase | null = null;
+    private bossDoorOpened = false;
+    private lastBossHealth = -1;
 
     constructor() {
         super(SCENE_KEYS.GAME);
@@ -129,6 +140,11 @@ export class GameScene extends Scene {
         this.peakFallVelocity = 0;
         this.lastFallDamageAt = -Infinity;
         this.previousGrowthStage = 0;
+        this.isDeathSequenceActive = false;
+        this.clearDeathModal();
+        this.bossEnemy = null;
+        this.bossDoorOpened = false;
+        this.lastBossHealth = -1;
     }
 
     create(): void {
@@ -155,7 +171,7 @@ export class GameScene extends Scene {
         this.bindProgressState();
         this.configureCamera();
         this.ensureHudScene();
-
+        this.announceBossFightIfNeeded();
 
         this.doorHintText = this.add.text(512, 188, "Kapıya girmek için Enter bas", {
             color: "#c8f7ff",
@@ -171,6 +187,8 @@ export class GameScene extends Scene {
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
             this.stopWalkSfx();
             this.isGrowthCinematicActive = false;
+            this.isDeathSequenceActive = false;
+            this.clearDeathModal();
             if (this.physics?.world) {
                 this.physics.world.resume();
                 this.physics.world.timeScale = 1;
@@ -186,11 +204,19 @@ export class GameScene extends Scene {
     }
 
     update(time: number, delta: number): void {
+        if (this.isDeathSequenceActive) {
+            this.updatePlayerAttackHitboxPosition();
+            this.stopWalkSfx();
+            return;
+        }
+
         if (!this.isGrowthCinematicActive) {
             this.handlePlayerInput();
             this.updateDoorInteraction();
             this.enemyManager.update(this.player, time, delta);
         }
+
+        this.updateBossHealthHud();
 
         this.updateFallDamageTracking(time);
         this.updatePlayerAttackHitboxPosition();
@@ -322,6 +348,8 @@ export class GameScene extends Scene {
         const worldHeight = mapData.height * mapData.tileheight;
         const tileLookup = this.getMapTileLookup();
         this.level.worldWidth = worldWidth;
+        this.level.spawn.x = Phaser.Math.Clamp(this.level.spawn.x, mapData.tilewidth * 2, worldWidth - mapData.tilewidth * 2);
+        this.level.spawn.y = worldHeight - (8 * mapData.tileheight) - PLAYER_SPAWN_Y_OFFSET;
         this.level.door.x = Math.max(mapData.tilewidth * 2, worldWidth - mapData.tilewidth * 4);
 
         // Place door 8 tiles above the ground (bottom of map)
@@ -331,8 +359,9 @@ export class GameScene extends Scene {
         this.physics.world.setBounds(0, 0, worldWidth, worldHeight);
         this.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
 
-        // Render order (back -> front): background, mid-background objects, solid, ladders.
+        // Render order (back -> front): background, background paint, mid, mid+, solid, ladders.
         this.drawMapLayer(mapData, MAP_LAYER_NAMES.background, tileLookup, -40, 0x143b55, 0.28);
+        this.drawMapLayer(mapData, MAP_LAYER_NAMES.backgroundPaint, tileLookup, -36, 0x204f69, 0.3);
         this.drawMapLayer(mapData, MAP_LAYER_NAMES.mid, tileLookup, -30, 0x2a6288, 0.36);
         this.drawMapLayer(mapData, MAP_LAYER_NAMES.midPlus, tileLookup, -20, 0x4b88a5, 0.44);
         this.drawMapLayer(mapData, MAP_LAYER_NAMES.solid, tileLookup, -8, 0x2d5f7b, 0.7);
@@ -371,6 +400,8 @@ export class GameScene extends Scene {
                 return ASSET_KEYS.MAP_LEVEL_2;
             case 3:
                 return ASSET_KEYS.MAP_LEVEL_3;
+            case 4:
+                return ASSET_KEYS.MAP_BOSS;
             default:
                 return null;
         }
@@ -616,14 +647,25 @@ export class GameScene extends Scene {
                 y: enemy.y
             });
             this.spawnCellPointBurst(enemy.x, enemy.y, enemy.getDropCellPoints());
+
+            if (enemy.kind === "boss") {
+                this.handleBossDefeated();
+            }
         });
+
+        this.bossEnemy = this.enemyManager.getBoss();
     }
 
     private resolveEnemySpawnsForMap(spawnPoints: SpawnPoint[]): SpawnPoint[] {
+        const desiredYOffset = this.mapCollisionTileHeight * ENEMY_SPAWN_UP_TILES;
+
         return spawnPoints.map((spawn) => {
-            const resolved = this.findBestSurfaceForSpawn(spawn.x, spawn.y);
+            const resolved = this.findBestSurfaceForSpawn(spawn.x, spawn.y - desiredYOffset);
             if (!resolved) {
-                return spawn;
+                return {
+                    ...spawn,
+                    y: spawn.y - desiredYOffset
+                };
             }
 
             // Enemies use center-origin; keep a stable gap between their feet and tile top.
@@ -691,7 +733,70 @@ export class GameScene extends Scene {
 
     private createDoor(): void {
         this.levelDoor = new LevelDoor(this, this.level.door.x, this.level.door.y);
+        const hasBossFight = this.level.id === 4 && Boolean(this.bossEnemy);
+        this.levelDoor.setOpen(!hasBossFight);
+    }
+
+    private announceBossFightIfNeeded(): void {
+        if (!this.bossEnemy) {
+            return;
+        }
+
+        this.lastBossHealth = this.bossEnemy.getHealth();
+        this.time.delayedCall(0, () => {
+            if (!this.sys.isActive() || !this.bossEnemy || !this.bossEnemy.active || !this.bossEnemy.isAlive()) {
+                return;
+            }
+
+            EventBus.emit(EVENT_KEYS.BOSS_FIGHT_STARTED, {
+                name: "Dr. Malignant",
+                currentHealth: this.bossEnemy.getHealth(),
+                maxHealth: this.bossEnemy.getMaxHealth()
+            });
+        });
+    }
+
+    private updateBossHealthHud(): void {
+        if (!this.bossEnemy || !this.bossEnemy.active || !this.bossEnemy.isAlive()) {
+            return;
+        }
+
+        const currentHealth = this.bossEnemy.getHealth();
+        if (currentHealth === this.lastBossHealth) {
+            return;
+        }
+
+        this.lastBossHealth = currentHealth;
+        EventBus.emit(EVENT_KEYS.BOSS_HEALTH_UPDATED, {
+            currentHealth,
+            maxHealth: this.bossEnemy.getMaxHealth()
+        });
+    }
+
+    private handleBossDefeated(): void {
+        if (!this.levelDoor || this.bossDoorOpened) {
+            return;
+        }
+
+        this.bossDoorOpened = true;
         this.levelDoor.setOpen(true);
+        this.doorProximityUntil = 0;
+        this.enterBufferedUntil = 0;
+        this.bossEnemy = null;
+
+        EventBus.emit(EVENT_KEYS.BOSS_DEFEATED, {
+            levelId: this.level.id
+        });
+
+        this.doorHintText?.setText("Boss yenildi! Kapı açıldı, Enter ile geç.");
+        this.doorHintText?.setVisible(true);
+        this.time.delayedCall(2200, () => {
+            if (!this.sys.isActive()) {
+                return;
+            }
+            this.doorHintText?.setText("Kapıya girmek için Enter bas");
+            this.doorHintText?.setVisible(false);
+        });
     }
 
     private createInput(): void {
@@ -824,7 +929,14 @@ export class GameScene extends Scene {
     }
 
     private bindProgressState(): void {
+        this.unsubscribeState?.();
+        this.unsubscribeState = null;
+
         this.unsubscribeState = gameState.onChange((snapshot) => {
+            if (!this.sys.isActive() || !this.player || !this.player.active) {
+                return;
+            }
+
             this.player.setGrowthStage(snapshot.run.growthStage);
             this.attackDamage = snapshot.stats.attackDamage;
 
@@ -928,23 +1040,134 @@ export class GameScene extends Scene {
     }
 
     private handlePlayerDeath(): void {
+        if (this.isDeathSequenceActive) {
+            return;
+        }
+
         EventBus.emit(EVENT_KEYS.PLAYER_DIED);
+        this.isDeathSequenceActive = true;
         this.playerAttackActive = false;
         this.playerAttackHitboxBody.enable = false;
         this.playerAttackHitbox.setActive(false);
         this.stopWalkSfx();
+        this.doorHintText?.setVisible(false);
+        this.player.setVelocity(0, 0);
+        this.player.setClimbing(false);
+        this.player.playLockedAction("death", DEATH_ANIMATION_MS);
+        this.player.setTint(0xff8f8f);
 
-        this.time.delayedCall(260, () => {
-            if (!this.sys.isActive() || !this.player?.active) {
+        this.physics.world.pause();
+        this.anims.globalTimeScale = DEATH_ANIM_TIME_SCALE;
+        this.tweens.add({
+            targets: this.player,
+            alpha: 0.42,
+            duration: 620,
+            yoyo: true,
+            repeat: 0,
+            ease: "Sine.easeInOut"
+        });
+
+        this.time.delayedCall(DEATH_ANIMATION_MS, () => {
+            if (!this.sys.isActive()) {
                 return;
             }
-            this.player.respawnAt(this.level.spawn.x, this.level.spawn.y);
-            gameState.restorePlayerVitals();
+
+            this.player.clearTint();
+            this.player.setAlpha(1);
+            this.anims.globalTimeScale = 1;
+            this.showDeathModal();
         });
     }
 
+    private showDeathModal(): void {
+        if (this.deathUiObjects.length > 0) {
+            return;
+        }
+
+        const { width, height } = this.scale;
+        this.scene.stop(SCENE_KEYS.HUD);
+
+        const backdrop = this.add
+            .rectangle(width * 0.5, height * 0.5, width, height, 0x000000, 0.72)
+            .setScrollFactor(0)
+            .setDepth(220)
+            .setInteractive();
+
+        const card = createMenuCard(this, { x: width * 0.5, y: height * 0.5, width: 520, height: 320, alpha: 0.96 });
+        card.setScrollFactor(0).setDepth(221);
+
+        const title = createMenuLabel(this, width * 0.5, height * 0.5 - 100, "Öldünüz", 44, "#ffd6d6")
+            .setScrollFactor(0)
+            .setDepth(222);
+
+        const subtitle = this.add.text(width * 0.5, height * 0.5 - 52, "Tekrar denemek ister misin?", {
+            fontFamily: "Verdana",
+            fontSize: "20px",
+            color: "#c9e6f5",
+            stroke: "#05131e",
+            strokeThickness: 3
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(222);
+
+        const restartButton = createMenuButton(this, {
+            x: width * 0.5,
+            y: height * 0.5 + 26,
+            width: 310,
+            height: 58,
+            fontSize: 28,
+            label: "Tekrar Başla",
+            onClick: () => this.restartLevelAfterDeath()
+        });
+        restartButton.root.setScrollFactor(0).setDepth(222);
+
+        const mainMenuButton = createMenuButton(this, {
+            x: width * 0.5,
+            y: height * 0.5 + 96,
+            width: 310,
+            height: 54,
+            fontSize: 24,
+            label: "Ana Sayfaya Dön",
+            onClick: () => this.returnToMainMenuAfterDeath()
+        });
+        mainMenuButton.root.setScrollFactor(0).setDepth(222);
+
+        this.deathUiObjects = [backdrop, card, title, subtitle, restartButton.root, mainMenuButton.root];
+    }
+
+    private clearDeathModal(): void {
+        this.deathUiObjects.forEach((object) => object.destroy());
+        this.deathUiObjects = [];
+    }
+
+    private restartLevelAfterDeath(): void {
+        const levelId = this.level.id;
+        this.isDeathSequenceActive = false;
+        this.clearDeathModal();
+        this.player.clearTint();
+        this.player.setAlpha(1);
+        this.physics.world.resume();
+        this.physics.world.timeScale = 1;
+        this.anims.globalTimeScale = 1;
+        this.scene.restart({ levelId });
+    }
+
+    private returnToMainMenuAfterDeath(): void {
+        this.isDeathSequenceActive = false;
+        this.clearDeathModal();
+        this.player.clearTint();
+        this.player.setAlpha(1);
+        this.physics.world.resume();
+        this.physics.world.timeScale = 1;
+        this.anims.globalTimeScale = 1;
+        this.scene.start(SCENE_KEYS.MAIN_MENU);
+    }
+
     private updateDoorInteraction(): void {
-        if (this.isCompletingLevel) {
+        if (this.isCompletingLevel || !this.levelDoor || !this.player?.active) {
+            return;
+        }
+
+        if (!this.levelDoor.isOpenDoor()) {
+            this.doorHintText.setVisible(false);
             return;
         }
 
@@ -954,7 +1177,8 @@ export class GameScene extends Scene {
             this.doorProximityUntil = now + DOOR_BUFFER_MS;
         }
 
-        if (Input.Keyboard.JustDown(this.confirmKey)) {
+        // Keep buffer alive while holding Enter to make door usage reliable across frames.
+        if (Input.Keyboard.JustDown(this.confirmKey) || this.confirmKey.isDown) {
             this.enterBufferedUntil = now + DOOR_BUFFER_MS;
         }
 
