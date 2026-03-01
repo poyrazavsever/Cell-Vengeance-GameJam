@@ -5,6 +5,7 @@ export type EnemyState =
     | "detect"
     | "telegraph"
     | "attack"
+    | "calm"
     | "special"
     | "summon"
     | "recover"

@@ -19,7 +19,8 @@ export const gameConfig: Types.Core.GameConfig = {
         mode: Scale.FIT,
         autoCenter: Scale.CENTER_BOTH,
         width: 1024,
-        height: 768
+        height: 768,
+        fullscreenTarget: "app"
     },
     parent: "game-container",
     backgroundColor: "#08131b",

@@ -31,6 +31,9 @@ export class LevelCompleteScene extends Scene {
         const levelId = (data.levelId ?? snapshot.run.levelId) as LevelId;
         this.payload = {
             levelId,
+            collectedCells: data.collectedCells ?? snapshot.run.collectedCells,
+            growthSpentInLevel: data.growthSpentInLevel ?? snapshot.run.growthSpentInLevel,
+            residualCells: data.residualCells ?? snapshot.run.residualCells,
             earned: data.earned ?? 0,
             walletBefore: data.walletBefore ?? snapshot.profile.walletPoints,
             walletAfter: data.walletAfter ?? snapshot.profile.walletPoints,
@@ -42,10 +45,12 @@ export class LevelCompleteScene extends Scene {
         ensureMenuMusic(this);
         drawMenuBackground(this);
         drawMenuHeader(this, `Bölüm ${this.payload.levelId} Tamamlandı`, "Artan hücreleri markette harca");
-        createMenuLabel(this, 512, 362, `Bölüm Sonu Artan Hücre: +${this.payload.earned} CP`, 24, "#b2ecff");
-        this.walletText = createMenuLabel(this, 512, 392, `Cüzdan: ${gameState.getSnapshot().profile.walletPoints} CP`, 24, "#ffe1a0");
+        createMenuLabel(this, 512, 340, `Toplanan Hücre: ${this.payload.collectedCells}`, 20, "#c7f2ff");
+        createMenuLabel(this, 512, 366, `Büyümeye Giden: ${this.payload.growthSpentInLevel}`, 20, "#a7d8ff");
+        createMenuLabel(this, 512, 392, `Cüzdana Geçen: +${this.payload.residualCells} CP`, 24, "#b2ecff");
+        this.walletText = createMenuLabel(this, 512, 422, `Cüzdan: ${gameState.getSnapshot().profile.walletPoints} CP`, 24, "#ffe1a0");
         createMenuCard(this, { x: 512, y: 566, width: 932, height: 372 });
-        createMenuLabel(this, 512, 425, "Market - Özellik Güçlendirmeleri", 24, "#9fdfff");
+        createMenuLabel(this, 512, 450, "Market - Özellik Güçlendirmeleri", 24, "#9fdfff");
 
         this.createShopRows();
         this.refreshShopRows();

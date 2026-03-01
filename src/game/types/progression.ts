@@ -13,6 +13,8 @@ export interface ProfileState {
     unlockedLevel: LevelId;
     selectedLevel: LevelId;
     walletPoints: number;
+    totalAbsorbedCells: number;
+    growthStage: GrowthStage;
     upgrades: Record<UpgradeKey, number>;
     introSeen: boolean;
     finaleSeen: boolean;
@@ -21,12 +23,19 @@ export interface ProfileState {
 export interface RunState {
     levelId: LevelId;
     collectedCells: number;
-    spentForGrowth: number;
+    growthSpentInLevel: number;
+    growthSpentBaseline: number;
     residualCells: number;
-    growthStage: GrowthStage;
     health: number;
     maxHealth: number;
     invulnerableUntil: number;
+}
+
+export interface GrowthBonuses {
+    maxHealthBonus: number;
+    attackBonus: number;
+    moveSpeedBonus: number;
+    jumpPowerBonus: number;
 }
 
 export interface PlayerStats {
@@ -36,6 +45,7 @@ export interface PlayerStats {
     jumpPower: number;
     dashBonus: number;
     canDash: boolean;
+    growthBonuses: GrowthBonuses;
 }
 
 export interface GameSnapshot {
@@ -53,6 +63,9 @@ export interface PurchaseResult {
 
 export interface LevelCompletionResult {
     levelId: LevelId;
+    collectedCells: number;
+    growthSpentInLevel: number;
+    residualCells: number;
     earned: number;
     walletBefore: number;
     walletAfter: number;
