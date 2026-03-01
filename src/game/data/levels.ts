@@ -1,4 +1,5 @@
 import { LevelDefinition, LevelPlatform } from "../types/level";
+import { LevelId } from "../types/progression";
 
 const createGround = (worldWidth: number): LevelPlatform[] => {
     const platforms: LevelPlatform[] = [];
@@ -56,7 +57,9 @@ const level3Platforms: LevelPlatform[] = [
     { key: "platform-sm", x: 4260, y: 430 }
 ];
 
-export const LEVELS: Record<1 | 2 | 3, LevelDefinition> = {
+const level4Platforms: LevelPlatform[] = [...createGround(1600)];
+
+export const LEVELS: Record<LevelId, LevelDefinition> = {
     1: {
         id: 1,
         name: "Bölüm 1 - Eğitim Lab",
@@ -114,9 +117,20 @@ export const LEVELS: Record<1 | 2 | 3, LevelDefinition> = {
             { kind: "spitter", x: 3440, y: 560, patrolMinX: 3360, patrolMaxX: 3560 },
             { kind: "brute", x: 4000, y: 710, patrolMinX: 3840, patrolMaxX: 4180 }
         ]
+    },
+    4: {
+        id: 4,
+        name: "Bölüm 4 - Boss Test Alanı",
+        worldWidth: 1600,
+        spawn: { x: 140, y: 364 },
+        door: { x: 1480, y: 676 },
+        platformPreset: level4Platforms,
+        enemySpawns: [
+            { kind: "boss", x: 880, y: 520, patrolMinX: 220, patrolMaxX: 1460 }
+        ]
     }
 };
 
-export const getLevelById = (id: 1 | 2 | 3): LevelDefinition => {
+export const getLevelById = (id: LevelId): LevelDefinition => {
     return LEVELS[id];
 };

@@ -28,6 +28,10 @@ export class HudScene extends Scene {
     private infoDashText!: Phaser.GameObjects.Text;
     private escKey!: Phaser.Input.Keyboard.Key;
     private lastSnapshot: GameSnapshot | null = null;
+    private bossBarContainer!: Phaser.GameObjects.Container;
+    private bossBarFill!: Phaser.GameObjects.Rectangle;
+    private bossBarValueText!: Phaser.GameObjects.Text;
+    private bossBarVisible = false;
 
     constructor() {
         super(SCENE_KEYS.HUD);
@@ -56,6 +60,8 @@ export class HudScene extends Scene {
             strokeThickness: 3
         }).setScrollFactor(0).setDepth(100);
 
+        this.createBossBar();
+
         // --- Info Panel (Pause overlay) ---
         this.createInfoPanel();
 
@@ -68,8 +74,14 @@ export class HudScene extends Scene {
         this.showInfoPanel();
 
         EventBus.on(EVENT_KEYS.PLAYER_PROGRESS_UPDATED, this.handleProgressUpdated, this);
+        EventBus.on(EVENT_KEYS.BOSS_FIGHT_STARTED, this.handleBossFightStarted, this);
+        EventBus.on(EVENT_KEYS.BOSS_HEALTH_UPDATED, this.handleBossHealthUpdated, this);
+        EventBus.on(EVENT_KEYS.BOSS_DEFEATED, this.handleBossDefeated, this);
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
             EventBus.off(EVENT_KEYS.PLAYER_PROGRESS_UPDATED, this.handleProgressUpdated, this);
+            EventBus.off(EVENT_KEYS.BOSS_FIGHT_STARTED, this.handleBossFightStarted, this);
+            EventBus.off(EVENT_KEYS.BOSS_HEALTH_UPDATED, this.handleBossHealthUpdated, this);
+            EventBus.off(EVENT_KEYS.BOSS_DEFEATED, this.handleBossDefeated, this);
         });
 
         // Initialize HUD with current state immediately
@@ -79,7 +91,7 @@ export class HudScene extends Scene {
     update(): void {
         if (this.escKey && Phaser.Input.Keyboard.JustDown(this.escKey)) {
             if (this.infoPanelVisible) {
-                this.goToMainMenu();
+                this.hideInfoPanel();
             } else {
                 this.showInfoPanel();
             }
@@ -230,15 +242,21 @@ export class HudScene extends Scene {
 
         const btnText = this.make.text({
             x: panelW * 0.5, y: rowY + 18,
-            text: "Ana Menüye Dön (ESC)",
+            text: "Ana Menüye Dön",
             style: { color: "#ff8888", fontFamily: "Verdana", fontSize: "14px", fontStyle: "bold" },
             origin: { x: 0.5, y: 0.5 },
             add: false
         });
 
+        const btnHitArea = this.add.zone(panelW * 0.5, rowY + 18, 200, 36).setOrigin(0.5).setInteractive();
+        btnHitArea.on("pointerdown", (_pointer: Phaser.Input.Pointer, _lx: number, _ly: number, event: Phaser.Types.Input.EventData) => {
+            event.stopPropagation();
+            this.goToMainMenu();
+        });
+
         const hintText = this.make.text({
             x: panelW * 0.5, y: panelH - 12,
-            text: "ESC: Ana Menü  |  Tıkla: Devam",
+            text: "ESC veya tıklama: Devam",
             style: { color: "#5aa8c8", fontFamily: "Verdana", fontSize: "12px" },
             origin: { x: 0.5, y: 1 },
             add: false
@@ -255,7 +273,7 @@ export class HudScene extends Scene {
             lbl7, this.infoSpeedText,
             lbl8, this.infoDashText,
             sep2, controlsText,
-            btnBg, btnText,
+            btnBg, btnText, btnHitArea,
             hintText
         ]).setDepth(200).setScrollFactor(0);
 
@@ -267,6 +285,40 @@ export class HudScene extends Scene {
         });
 
         this.infoPanelContainer.setVisible(false);
+    }
+
+    private createBossBar(): void {
+        const { width } = this.scale;
+        const barWidth = 360;
+        const barHeight = 18;
+        const x = width * 0.5;
+        const y = 34;
+
+        const bg = this.add.rectangle(0, 0, barWidth + 10, barHeight + 10, 0x07131d, 0.88)
+            .setStrokeStyle(2, 0x7fdcff, 0.75);
+        const fillBg = this.add.rectangle(0, 0, barWidth, barHeight, 0x1c2f3d, 0.95).setOrigin(0.5);
+        this.bossBarFill = this.add.rectangle(-barWidth * 0.5, 0, barWidth, barHeight, 0xff5574, 1).setOrigin(0, 0.5);
+        const title = this.add.text(0, -20, "BOSS", {
+            fontFamily: "Verdana",
+            fontSize: "14px",
+            color: "#ffd1d8",
+            fontStyle: "bold",
+            stroke: "#041822",
+            strokeThickness: 3
+        }).setOrigin(0.5);
+        this.bossBarValueText = this.add.text(0, 0, "0/0", {
+            fontFamily: "Verdana",
+            fontSize: "12px",
+            color: "#ffeef1",
+            fontStyle: "bold",
+            stroke: "#041822",
+            strokeThickness: 3
+        }).setOrigin(0.5);
+
+        this.bossBarContainer = this.add.container(x, y, [bg, fillBg, this.bossBarFill, title, this.bossBarValueText])
+            .setScrollFactor(0)
+            .setDepth(130)
+            .setVisible(false);
     }
 
     private showInfoPanel(): void {
@@ -315,5 +367,44 @@ export class HudScene extends Scene {
         this.infoAtkText.setText(`${snapshot.stats.attackDamage}`);
         this.infoSpeedText.setText(`${snapshot.stats.moveBase}`);
         this.infoDashText.setText(snapshot.stats.canDash ? "Açık" : "Kapalı");
+    }
+
+    private handleBossFightStarted(payload: { currentHealth: number; maxHealth: number }): void {
+        this.bossBarVisible = true;
+        this.bossBarContainer.setVisible(true).setAlpha(1);
+        this.applyBossHealth(payload.currentHealth, payload.maxHealth);
+    }
+
+    private handleBossHealthUpdated(payload: { currentHealth: number; maxHealth: number }): void {
+        if (!this.bossBarVisible) {
+            this.bossBarVisible = true;
+            this.bossBarContainer.setVisible(true).setAlpha(1);
+        }
+        this.applyBossHealth(payload.currentHealth, payload.maxHealth);
+    }
+
+    private handleBossDefeated(): void {
+        if (!this.bossBarVisible) {
+            return;
+        }
+
+        this.bossBarVisible = false;
+        this.tweens.add({
+            targets: this.bossBarContainer,
+            alpha: 0,
+            duration: 250,
+            onComplete: () => {
+                this.bossBarContainer.setVisible(false);
+            }
+        });
+    }
+
+    private applyBossHealth(currentHealth: number, maxHealth: number): void {
+        const barWidth = 360;
+        const safeMax = Math.max(1, maxHealth);
+        const safeCurrent = Phaser.Math.Clamp(currentHealth, 0, safeMax);
+        const ratio = safeCurrent / safeMax;
+        this.bossBarFill.width = barWidth * ratio;
+        this.bossBarValueText.setText(`${safeCurrent}/${safeMax}`);
     }
 }

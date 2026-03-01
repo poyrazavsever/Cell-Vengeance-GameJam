@@ -17,6 +17,7 @@ import { DamageSource } from "../types/combat";
 import { SpawnPoint } from "../types/enemy";
 import { LevelDefinition } from "../types/level";
 import { LevelId } from "../types/progression";
+import { createMenuButton, createMenuCard, createMenuLabel } from "../ui/menuTheme";
 
 interface MovementKeys extends Phaser.Types.Input.Keyboard.CursorKeys {
     leftAlt: Phaser.Input.Keyboard.Key;
@@ -56,14 +57,26 @@ interface MapTileLookupEntry {
 
 type MapTileLookup = Record<string, MapTileLookupEntry>;
 
-const PLAYER_ATTACK_DURATION_MS = 140;
+const PLAYER_ATTACK_DURATION_MS = 160;
 const WORLD_HEIGHT = 800;
 const CAMERA_ZOOM = 1.45;
+const DOOR_BUFFER_MS = 260;
+const FALL_DAMAGE_THRESHOLD_Y = 760;
+const FALL_DAMAGE_AMOUNT = 1;
+const FALL_DAMAGE_LANDING_LOCK_MS = 160;
+const GROWTH_FREEZE_MS = 250;
+const GROWTH_SLOWMO_MS = 1100;
+const DEATH_ANIMATION_MS = 1450;
+const DEATH_ANIM_TIME_SCALE = 0.55;
+const PICKUP_COLLECT_DELAY_MS = 320;
+const PLAYER_SPAWN_Y_OFFSET = 180;
+const ENEMY_SPAWN_UP_TILES = 10;
 const MAP_LAYER_NAMES = {
     background: ["Arkaplan"],
-    upper: ["Üst katman"],
-    upperPlus: ["Üst+ katman"],
-    solid: ["Ana katman", "Tile Layer 3"],
+    backgroundPaint: ["Arkaplan Boya"],
+    mid: ["Arkaplan Onu", "Arkaplan Önü", "Arkaplan Objeler", "Üst katman"],
+    midPlus: ["Üst+ katman"],
+    solid: ["Ana katman", "Ana Katman", "Tile Layer 3"],
     ladder: ["Merdiven"]
 } as const;
 
@@ -95,6 +108,17 @@ export class GameScene extends Scene {
     private confirmKey!: Phaser.Input.Keyboard.Key;
     private ladderZones!: Phaser.Physics.Arcade.StaticGroup;
     private playerOnLadder = false;
+    private doorProximityUntil = 0;
+    private enterBufferedUntil = 0;
+    private wasGroundedLastFrame = false;
+    private peakFallVelocity = 0;
+    private lastFallDamageAt = -Infinity;
+    private isGrowthCinematicActive = false;
+    private isDeathSequenceActive = false;
+    private deathUiObjects: Phaser.GameObjects.GameObject[] = [];
+    private bossEnemy: EnemyBase | null = null;
+    private bossDoorOpened = false;
+    private lastBossHealth = -1;
 
     constructor() {
         super(SCENE_KEYS.GAME);
@@ -106,6 +130,21 @@ export class GameScene extends Scene {
         const levelId = gameState.canPlayLevel(requestedLevel) ? requestedLevel : snapshot.profile.unlockedLevel;
         this.level = getLevelById(levelId);
         this.currentMapAssetKey = this.resolveMapAssetKey(levelId);
+
+        // Scene instance is reused between level transitions, so runtime flags must be reset explicitly.
+        this.isCompletingLevel = false;
+        this.isGrowthCinematicActive = false;
+        this.doorProximityUntil = 0;
+        this.enterBufferedUntil = 0;
+        this.wasGroundedLastFrame = false;
+        this.peakFallVelocity = 0;
+        this.lastFallDamageAt = -Infinity;
+        this.previousGrowthStage = 0;
+        this.isDeathSequenceActive = false;
+        this.clearDeathModal();
+        this.bossEnemy = null;
+        this.bossDoorOpened = false;
+        this.lastBossHealth = -1;
     }
 
     create(): void {
@@ -132,7 +171,7 @@ export class GameScene extends Scene {
         this.bindProgressState();
         this.configureCamera();
         this.ensureHudScene();
-
+        this.announceBossFightIfNeeded();
 
         this.doorHintText = this.add.text(512, 188, "Kapıya girmek için Enter bas", {
             color: "#c8f7ff",
@@ -147,25 +186,49 @@ export class GameScene extends Scene {
 
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
             this.stopWalkSfx();
+            this.isGrowthCinematicActive = false;
+            this.isDeathSequenceActive = false;
+            this.clearDeathModal();
+            if (this.physics?.world) {
+                this.physics.world.resume();
+                this.physics.world.timeScale = 1;
+            }
+            this.anims.globalTimeScale = 1;
             this.walkSound?.destroy();
             this.walkSound = null;
-            this.playerAttackHitbox.destroy();
-            this.levelDoor.destroy();
+            this.playerAttackHitbox?.destroy();
+            this.levelDoor?.destroy();
             this.unsubscribeState?.();
             this.unsubscribeState = null;
         });
     }
 
     update(time: number, delta: number): void {
-        this.handlePlayerInput();
-        this.updateDoorInteraction();
-        this.enemyManager.update(this.player, time, delta);
+        if (this.isDeathSequenceActive) {
+            this.updatePlayerAttackHitboxPosition();
+            this.stopWalkSfx();
+            return;
+        }
+
+        if (!this.isGrowthCinematicActive) {
+            this.handlePlayerInput();
+            this.updateDoorInteraction();
+            this.enemyManager.update(this.player, time, delta);
+        }
+
+        this.updateBossHealthHud();
+
+        this.updateFallDamageTracking(time);
         this.updatePlayerAttackHitboxPosition();
         this.updateWalkSound();
         this.updateInvulnerabilityVisual(time);
     }
 
     private handlePlayerInput(): void {
+        if (this.isGrowthCinematicActive) {
+            return;
+        }
+
         const snapshot = gameState.getSnapshot();
         const stats = snapshot.stats;
         let direction = 0;
@@ -285,6 +348,8 @@ export class GameScene extends Scene {
         const worldHeight = mapData.height * mapData.tileheight;
         const tileLookup = this.getMapTileLookup();
         this.level.worldWidth = worldWidth;
+        this.level.spawn.x = Phaser.Math.Clamp(this.level.spawn.x, mapData.tilewidth * 2, worldWidth - mapData.tilewidth * 2);
+        this.level.spawn.y = worldHeight - (8 * mapData.tileheight) - PLAYER_SPAWN_Y_OFFSET;
         this.level.door.x = Math.max(mapData.tilewidth * 2, worldWidth - mapData.tilewidth * 4);
 
         // Place door 8 tiles above the ground (bottom of map)
@@ -294,9 +359,11 @@ export class GameScene extends Scene {
         this.physics.world.setBounds(0, 0, worldWidth, worldHeight);
         this.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
 
+        // Render order (back -> front): background, background paint, mid, mid+, solid, ladders.
         this.drawMapLayer(mapData, MAP_LAYER_NAMES.background, tileLookup, -40, 0x143b55, 0.28);
-        this.drawMapLayer(mapData, MAP_LAYER_NAMES.upper, tileLookup, -30, 0x2a6288, 0.36);
-        this.drawMapLayer(mapData, MAP_LAYER_NAMES.upperPlus, tileLookup, -20, 0x4b88a5, 0.44);
+        this.drawMapLayer(mapData, MAP_LAYER_NAMES.backgroundPaint, tileLookup, -36, 0x204f69, 0.3);
+        this.drawMapLayer(mapData, MAP_LAYER_NAMES.mid, tileLookup, -30, 0x2a6288, 0.36);
+        this.drawMapLayer(mapData, MAP_LAYER_NAMES.midPlus, tileLookup, -20, 0x4b88a5, 0.44);
         this.drawMapLayer(mapData, MAP_LAYER_NAMES.solid, tileLookup, -8, 0x2d5f7b, 0.7);
         this.drawMapLayer(mapData, MAP_LAYER_NAMES.ladder, tileLookup, 8, 0x8bd3ff, 0.6);
 
@@ -333,6 +400,8 @@ export class GameScene extends Scene {
                 return ASSET_KEYS.MAP_LEVEL_2;
             case 3:
                 return ASSET_KEYS.MAP_LEVEL_3;
+            case 4:
+                return ASSET_KEYS.MAP_BOSS;
             default:
                 return null;
         }
@@ -444,14 +513,25 @@ export class GameScene extends Scene {
     }
 
     private getFirstMapLayerByNames(mapData: TiledMapData, layerNames: readonly string[]): TiledLayerData | null {
-        for (const layerName of layerNames) {
-            const found = mapData.layers.find((candidate) => candidate.type === "tilelayer" && candidate.name === layerName);
+        const normalizedNames = layerNames.map((name) => this.normalizeLayerName(name));
+        for (const normalizedLayerName of normalizedNames) {
+            const found = mapData.layers.find((candidate) => {
+                if (candidate.type !== "tilelayer") {
+                    return false;
+                }
+
+                return this.normalizeLayerName(candidate.name) === normalizedLayerName;
+            });
             if (found?.data) {
                 return found;
             }
         }
 
         return null;
+    }
+
+    private normalizeLayerName(name: string): string {
+        return name.trim().toLocaleLowerCase("tr-TR");
     }
 
     private createCollisionFromLayer(layer: TiledLayerData, tileWidth: number, tileHeight: number): void {
@@ -567,14 +647,25 @@ export class GameScene extends Scene {
                 y: enemy.y
             });
             this.spawnCellPointBurst(enemy.x, enemy.y, enemy.getDropCellPoints());
+
+            if (enemy.kind === "boss") {
+                this.handleBossDefeated();
+            }
         });
+
+        this.bossEnemy = this.enemyManager.getBoss();
     }
 
     private resolveEnemySpawnsForMap(spawnPoints: SpawnPoint[]): SpawnPoint[] {
+        const desiredYOffset = this.mapCollisionTileHeight * ENEMY_SPAWN_UP_TILES;
+
         return spawnPoints.map((spawn) => {
-            const resolved = this.findBestSurfaceForSpawn(spawn.x, spawn.y);
+            const resolved = this.findBestSurfaceForSpawn(spawn.x, spawn.y - desiredYOffset);
             if (!resolved) {
-                return spawn;
+                return {
+                    ...spawn,
+                    y: spawn.y - desiredYOffset
+                };
             }
 
             // Enemies use center-origin; keep a stable gap between their feet and tile top.
@@ -642,7 +733,70 @@ export class GameScene extends Scene {
 
     private createDoor(): void {
         this.levelDoor = new LevelDoor(this, this.level.door.x, this.level.door.y);
+        const hasBossFight = this.level.id === 4 && Boolean(this.bossEnemy);
+        this.levelDoor.setOpen(!hasBossFight);
+    }
+
+    private announceBossFightIfNeeded(): void {
+        if (!this.bossEnemy) {
+            return;
+        }
+
+        this.lastBossHealth = this.bossEnemy.getHealth();
+        this.time.delayedCall(0, () => {
+            if (!this.sys.isActive() || !this.bossEnemy || !this.bossEnemy.active || !this.bossEnemy.isAlive()) {
+                return;
+            }
+
+            EventBus.emit(EVENT_KEYS.BOSS_FIGHT_STARTED, {
+                name: "Dr. Malignant",
+                currentHealth: this.bossEnemy.getHealth(),
+                maxHealth: this.bossEnemy.getMaxHealth()
+            });
+        });
+    }
+
+    private updateBossHealthHud(): void {
+        if (!this.bossEnemy || !this.bossEnemy.active || !this.bossEnemy.isAlive()) {
+            return;
+        }
+
+        const currentHealth = this.bossEnemy.getHealth();
+        if (currentHealth === this.lastBossHealth) {
+            return;
+        }
+
+        this.lastBossHealth = currentHealth;
+        EventBus.emit(EVENT_KEYS.BOSS_HEALTH_UPDATED, {
+            currentHealth,
+            maxHealth: this.bossEnemy.getMaxHealth()
+        });
+    }
+
+    private handleBossDefeated(): void {
+        if (!this.levelDoor || this.bossDoorOpened) {
+            return;
+        }
+
+        this.bossDoorOpened = true;
         this.levelDoor.setOpen(true);
+        this.doorProximityUntil = 0;
+        this.enterBufferedUntil = 0;
+        this.bossEnemy = null;
+
+        EventBus.emit(EVENT_KEYS.BOSS_DEFEATED, {
+            levelId: this.level.id
+        });
+
+        this.doorHintText?.setText("Boss yenildi! Kapı açıldı, Enter ile geç.");
+        this.doorHintText?.setVisible(true);
+        this.time.delayedCall(2200, () => {
+            if (!this.sys.isActive()) {
+                return;
+            }
+            this.doorHintText?.setText("Kapıya girmek için Enter bas");
+            this.doorHintText?.setVisible(false);
+        });
     }
 
     private createInput(): void {
@@ -689,10 +843,13 @@ export class GameScene extends Scene {
             collideWorldBounds: true
         });
 
-        this.physics.add.collider(this.pickups, this.platforms);
+        this.physics.add.collider(this.pickups, this.platforms, (pickup) => {
+            const pickupObject = pickup as Phaser.Physics.Arcade.Image;
+            pickupObject.setData("groundedOnce", true);
+        });
         this.physics.add.overlap(this.player, this.pickups, (_player, pickup) => {
             const pickupObject = pickup as Phaser.Physics.Arcade.Image;
-            this.absorbPickup(pickupObject);
+            this.tryCollectPickup(pickupObject);
         });
     }
 
@@ -772,7 +929,14 @@ export class GameScene extends Scene {
     }
 
     private bindProgressState(): void {
+        this.unsubscribeState?.();
+        this.unsubscribeState = null;
+
         this.unsubscribeState = gameState.onChange((snapshot) => {
+            if (!this.sys.isActive() || !this.player || !this.player.active) {
+                return;
+            }
+
             this.player.setGrowthStage(snapshot.run.growthStage);
             this.attackDamage = snapshot.stats.attackDamage;
 
@@ -785,8 +949,7 @@ export class GameScene extends Scene {
             EventBus.emit(EVENT_KEYS.PROFILE_UPDATED, snapshot.profile);
 
             if (snapshot.run.growthStage > this.previousGrowthStage) {
-                this.player.playGrowthEffect();
-                this.cameras.main.shake(80, 0.0035);
+                this.startGrowthCinematic();
                 EventBus.emit(EVENT_KEYS.PLAYER_GROWTH_STAGE_CHANGED, snapshot);
             }
 
@@ -795,7 +958,7 @@ export class GameScene extends Scene {
     }
 
     private triggerPlayerAttack(): void {
-        this.player.playLockedAction("attack", 320);
+        this.player.playLockedAction("attack", 380);
         this.playSfxOnce(ASSET_KEYS.SFX_PLAYER_ATTACK, 0.35);
 
         this.playerAttackActive = true;
@@ -805,6 +968,9 @@ export class GameScene extends Scene {
         this.updatePlayerAttackHitboxPosition();
 
         this.time.delayedCall(PLAYER_ATTACK_DURATION_MS, () => {
+            if (!this.sys.isActive() || !this.playerAttackHitbox?.active) {
+                return;
+            }
             this.playerAttackActive = false;
             this.playerAttackHitboxBody.enable = false;
             this.playerAttackHitbox.setActive(false);
@@ -842,7 +1008,12 @@ export class GameScene extends Scene {
         return true;
     }
 
-    private applyDamageToPlayer(amount: number, source: DamageSource, sourceX: number): void {
+    private applyDamageToPlayer(
+        amount: number,
+        source: DamageSource,
+        sourceX: number,
+        applyKnockback = true
+    ): void {
         const damageResult = gameState.applyPlayerDamage(amount, this.time.now);
         if (!damageResult.applied) {
             return;
@@ -858,8 +1029,10 @@ export class GameScene extends Scene {
         this.player.playLockedAction("hit", 240);
         this.playSfxOnce(ASSET_KEYS.SFX_PLAYER_HIT, 0.4);
 
-        const knockbackDirection = this.player.x < sourceX ? -1 : 1;
-        this.player.applyKnockback(knockbackDirection * 220, -260);
+        if (applyKnockback) {
+            const knockbackDirection = this.player.x < sourceX ? -1 : 1;
+            this.player.applyKnockback(knockbackDirection * 220, -260);
+        }
 
         if (damageResult.dead) {
             this.handlePlayerDeath();
@@ -867,30 +1040,152 @@ export class GameScene extends Scene {
     }
 
     private handlePlayerDeath(): void {
+        if (this.isDeathSequenceActive) {
+            return;
+        }
+
         EventBus.emit(EVENT_KEYS.PLAYER_DIED);
+        this.isDeathSequenceActive = true;
         this.playerAttackActive = false;
         this.playerAttackHitboxBody.enable = false;
         this.playerAttackHitbox.setActive(false);
         this.stopWalkSfx();
+        this.doorHintText?.setVisible(false);
+        this.player.setVelocity(0, 0);
+        this.player.setClimbing(false);
+        this.player.playLockedAction("death", DEATH_ANIMATION_MS);
+        this.player.setTint(0xff8f8f);
 
-        this.time.delayedCall(260, () => {
-            this.player.respawnAt(this.level.spawn.x, this.level.spawn.y);
-            gameState.restorePlayerVitals();
+        this.physics.world.pause();
+        this.anims.globalTimeScale = DEATH_ANIM_TIME_SCALE;
+        this.tweens.add({
+            targets: this.player,
+            alpha: 0.42,
+            duration: 620,
+            yoyo: true,
+            repeat: 0,
+            ease: "Sine.easeInOut"
+        });
+
+        this.time.delayedCall(DEATH_ANIMATION_MS, () => {
+            if (!this.sys.isActive()) {
+                return;
+            }
+
+            this.player.clearTint();
+            this.player.setAlpha(1);
+            this.anims.globalTimeScale = 1;
+            this.showDeathModal();
         });
     }
 
-    private updateDoorInteraction(): void {
-        if (this.isCompletingLevel) {
+    private showDeathModal(): void {
+        if (this.deathUiObjects.length > 0) {
             return;
         }
 
+        const { width, height } = this.scale;
+        this.scene.stop(SCENE_KEYS.HUD);
+
+        const backdrop = this.add
+            .rectangle(width * 0.5, height * 0.5, width, height, 0x000000, 0.72)
+            .setScrollFactor(0)
+            .setDepth(220)
+            .setInteractive();
+
+        const card = createMenuCard(this, { x: width * 0.5, y: height * 0.5, width: 520, height: 320, alpha: 0.96 });
+        card.setScrollFactor(0).setDepth(221);
+
+        const title = createMenuLabel(this, width * 0.5, height * 0.5 - 100, "Öldünüz", 44, "#ffd6d6")
+            .setScrollFactor(0)
+            .setDepth(222);
+
+        const subtitle = this.add.text(width * 0.5, height * 0.5 - 52, "Tekrar denemek ister misin?", {
+            fontFamily: "Verdana",
+            fontSize: "20px",
+            color: "#c9e6f5",
+            stroke: "#05131e",
+            strokeThickness: 3
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(222);
+
+        const restartButton = createMenuButton(this, {
+            x: width * 0.5,
+            y: height * 0.5 + 26,
+            width: 310,
+            height: 58,
+            fontSize: 28,
+            label: "Tekrar Başla",
+            onClick: () => this.restartLevelAfterDeath()
+        });
+        restartButton.root.setScrollFactor(0).setDepth(222);
+
+        const mainMenuButton = createMenuButton(this, {
+            x: width * 0.5,
+            y: height * 0.5 + 96,
+            width: 310,
+            height: 54,
+            fontSize: 24,
+            label: "Ana Sayfaya Dön",
+            onClick: () => this.returnToMainMenuAfterDeath()
+        });
+        mainMenuButton.root.setScrollFactor(0).setDepth(222);
+
+        this.deathUiObjects = [backdrop, card, title, subtitle, restartButton.root, mainMenuButton.root];
+    }
+
+    private clearDeathModal(): void {
+        this.deathUiObjects.forEach((object) => object.destroy());
+        this.deathUiObjects = [];
+    }
+
+    private restartLevelAfterDeath(): void {
+        const levelId = this.level.id;
+        this.isDeathSequenceActive = false;
+        this.clearDeathModal();
+        this.player.clearTint();
+        this.player.setAlpha(1);
+        this.physics.world.resume();
+        this.physics.world.timeScale = 1;
+        this.anims.globalTimeScale = 1;
+        this.scene.restart({ levelId });
+    }
+
+    private returnToMainMenuAfterDeath(): void {
+        this.isDeathSequenceActive = false;
+        this.clearDeathModal();
+        this.player.clearTint();
+        this.player.setAlpha(1);
+        this.physics.world.resume();
+        this.physics.world.timeScale = 1;
+        this.anims.globalTimeScale = 1;
+        this.scene.start(SCENE_KEYS.MAIN_MENU);
+    }
+
+    private updateDoorInteraction(): void {
+        if (this.isCompletingLevel || !this.levelDoor || !this.player?.active) {
+            return;
+        }
+
+        if (!this.levelDoor.isOpenDoor()) {
+            this.doorHintText.setVisible(false);
+            return;
+        }
+
+        const now = this.time.now;
         const playerBounds = this.player.getBounds();
-        const canEnter = this.levelDoor.isPlayerInside(playerBounds);
+        if (this.levelDoor.isPlayerInside(playerBounds)) {
+            this.doorProximityUntil = now + DOOR_BUFFER_MS;
+        }
+
+        // Keep buffer alive while holding Enter to make door usage reliable across frames.
+        if (Input.Keyboard.JustDown(this.confirmKey) || this.confirmKey.isDown) {
+            this.enterBufferedUntil = now + DOOR_BUFFER_MS;
+        }
+
+        const canEnter = now <= this.doorProximityUntil;
         this.doorHintText.setVisible(canEnter);
 
-        // Allow both tap and hold so door entry is not frame-timing dependent.
-        const requestedEnter = Input.Keyboard.JustDown(this.confirmKey) || this.confirmKey.isDown;
-        if (canEnter && requestedEnter) {
+        if (canEnter && now <= this.enterBufferedUntil) {
             this.completeCurrentLevel();
         }
     }
@@ -921,33 +1216,43 @@ export class GameScene extends Scene {
             pickup.setBounce(0.3);
             pickup.setDrag(40, 0);
             pickup.setData("value", 1);
+            this.initializePickupData(pickup);
             pickup.setVelocity(Phaser.Math.Between(-120, 120), Phaser.Math.Between(-240, -110));
         }
     }
 
-    private absorbPickup(pickup: Phaser.Physics.Arcade.Image): void {
-        if (!pickup.active || pickup.getData("absorbing")) {
+    private initializePickupData(pickup: Phaser.Physics.Arcade.Image): void {
+        pickup.setData("collectibleAt", this.time.now + PICKUP_COLLECT_DELAY_MS);
+        pickup.setData("groundedOnce", false);
+        pickup.setData("collecting", false);
+    }
+
+    private tryCollectPickup(pickup: Phaser.Physics.Arcade.Image): void {
+        if (!pickup.active || pickup.getData("collecting")) {
+            return;
+        }
+
+        const collectibleAt = (pickup.getData("collectibleAt") as number | undefined) ?? 0;
+        const groundedOnce = Boolean(pickup.getData("groundedOnce"));
+        if (!groundedOnce || this.time.now < collectibleAt) {
             return;
         }
 
         const value = pickup.getData("value") as number | undefined;
-        pickup.setData("absorbing", true);
+        pickup.setData("collecting", true);
         pickup.body?.stop();
         if (pickup.body instanceof Physics.Arcade.Body) {
             pickup.body.enable = false;
-            pickup.body.setAllowGravity(false);
         }
-        pickup.setVelocity(0, 0);
         pickup.setDepth(32);
 
         this.tweens.add({
             targets: pickup,
-            x: this.player.x,
-            y: this.player.y - 8,
-            scale: 0.2,
-            alpha: 0.25,
-            duration: Phaser.Math.Between(160, 220),
-            ease: "Sine.easeIn",
+            scaleX: pickup.scaleX * 1.18,
+            scaleY: pickup.scaleY * 1.18,
+            alpha: 0,
+            duration: 140,
+            ease: "Sine.easeOut",
             onComplete: () => {
                 pickup.destroy();
                 gameState.addCellPoints(value ?? 1);
@@ -956,6 +1261,11 @@ export class GameScene extends Scene {
     }
 
     private updateWalkSound(): void {
+        if (this.isGrowthCinematicActive) {
+            this.stopWalkSfx();
+            return;
+        }
+
         const onGround = Boolean(this.player.body?.blocked.down || this.player.body?.touching.down);
         const isWalkingOnGround = onGround && Math.abs(this.player.body?.velocity.x ?? 0) > 2;
         if (isWalkingOnGround) {
@@ -995,29 +1305,39 @@ export class GameScene extends Scene {
         const graphics = this.add.graphics({ x: 0, y: 0 });
         graphics.setVisible(false);
 
-        graphics.fillStyle(0x2b5161, 1);
-        graphics.fillRoundedRect(0, 0, 620, 32, 10);
-        graphics.generateTexture("platform-lg", 620, 32);
+        if (!this.textures.exists("platform-lg")) {
+            graphics.fillStyle(0x2b5161, 1);
+            graphics.fillRoundedRect(0, 0, 620, 32, 10);
+            graphics.generateTexture("platform-lg", 620, 32);
+        }
         graphics.clear();
 
-        graphics.fillStyle(0x346a7f, 1);
-        graphics.fillRoundedRect(0, 0, 320, 28, 10);
-        graphics.generateTexture("platform-md", 320, 28);
+        if (!this.textures.exists("platform-md")) {
+            graphics.fillStyle(0x346a7f, 1);
+            graphics.fillRoundedRect(0, 0, 320, 28, 10);
+            graphics.generateTexture("platform-md", 320, 28);
+        }
         graphics.clear();
 
-        graphics.fillStyle(0x3f7f94, 1);
-        graphics.fillRoundedRect(0, 0, 200, 24, 10);
-        graphics.generateTexture("platform-sm", 200, 24);
+        if (!this.textures.exists("platform-sm")) {
+            graphics.fillStyle(0x3f7f94, 1);
+            graphics.fillRoundedRect(0, 0, 200, 24, 10);
+            graphics.generateTexture("platform-sm", 200, 24);
+        }
         graphics.clear();
 
-        graphics.fillStyle(0xffffff, 1);
-        graphics.fillRect(0, 0, 1, 1);
-        graphics.generateTexture("platform-pixel", 1, 1);
+        if (!this.textures.exists("platform-pixel")) {
+            graphics.fillStyle(0xffffff, 1);
+            graphics.fillRect(0, 0, 1, 1);
+            graphics.generateTexture("platform-pixel", 1, 1);
+        }
         graphics.clear();
 
-        graphics.fillStyle(0x87ffb9, 1);
-        graphics.fillCircle(8, 8, 8);
-        graphics.generateTexture("acid-projectile", 16, 16);
+        if (!this.textures.exists("acid-projectile")) {
+            graphics.fillStyle(0x87ffb9, 1);
+            graphics.fillCircle(8, 8, 8);
+            graphics.generateTexture("acid-projectile", 16, 16);
+        }
         graphics.destroy();
     }
 
@@ -1032,9 +1352,10 @@ export class GameScene extends Scene {
 
     private configureCamera(): void {
         this.cameras.main.setZoom(CAMERA_ZOOM);
-        this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
-        this.cameras.main.setDeadzone(360, 320);
-        this.cameras.main.setFollowOffset(-180, 0);
+        // Keep the player centered and avoid camera lag when direction changes quickly.
+        this.cameras.main.startFollow(this.player, true, 1, 1);
+        this.cameras.main.setDeadzone(0, 0);
+        this.cameras.main.setFollowOffset(0, 0);
     }
 
     private ensureHudScene(): void {
@@ -1050,10 +1371,88 @@ export class GameScene extends Scene {
         const minX = Phaser.Math.Clamp(this.player.x + 240, 60, this.level.worldWidth - 80);
         const maxX = Phaser.Math.Clamp(this.player.x + 760, 80, this.level.worldWidth - 60);
         const spawnX = Phaser.Math.Between(Math.min(minX, maxX), Math.max(minX, maxX));
-        const pickup = this.pickups.create(spawnX, 20, "cell-point") as Phaser.Physics.Arcade.Image;
+        const pickup = this.pickups.create(spawnX, 20, ASSET_KEYS.CELL_POINT) as Phaser.Physics.Arcade.Image;
 
+        pickup.setScale(0.08);
         pickup.setBounce(0.25);
         pickup.setDrag(20, 0);
         pickup.setData("value", 2);
+        this.initializePickupData(pickup);
+    }
+
+    private updateFallDamageTracking(time: number): void {
+        if (this.isGrowthCinematicActive) {
+            this.wasGroundedLastFrame = false;
+            this.peakFallVelocity = 0;
+            return;
+        }
+
+        const body = this.player.body as Physics.Arcade.Body | null;
+        if (!body) {
+            return;
+        }
+
+        if (this.player.isClimbing()) {
+            this.wasGroundedLastFrame = false;
+            this.peakFallVelocity = 0;
+            return;
+        }
+
+        const grounded = this.isPlayerGrounded(body);
+        if (!grounded) {
+            this.peakFallVelocity = Math.max(this.peakFallVelocity, body.velocity.y);
+        } else if (!this.wasGroundedLastFrame) {
+            if (
+                this.peakFallVelocity >= FALL_DAMAGE_THRESHOLD_Y
+                && time - this.lastFallDamageAt >= FALL_DAMAGE_LANDING_LOCK_MS
+            ) {
+                this.lastFallDamageAt = time;
+                this.applyDamageToPlayer(FALL_DAMAGE_AMOUNT, "fall", this.player.x, false);
+            }
+            this.peakFallVelocity = 0;
+        } else {
+            this.peakFallVelocity = 0;
+        }
+
+        this.wasGroundedLastFrame = grounded;
+    }
+
+    private isPlayerGrounded(body: Physics.Arcade.Body): boolean {
+        return Boolean(body.blocked.down || body.touching.down);
+    }
+
+    private startGrowthCinematic(): void {
+        if (this.isGrowthCinematicActive || !this.player.active) {
+            return;
+        }
+
+        this.isGrowthCinematicActive = true;
+        this.playerAttackActive = false;
+        this.playerAttackHitboxBody.enable = false;
+        this.playerAttackHitbox.setActive(false);
+        this.stopWalkSfx();
+        this.cameras.main.shake(110, 0.0035);
+
+        this.physics.world.pause();
+        this.time.delayedCall(GROWTH_FREEZE_MS, () => {
+            if (!this.sys.isActive()) {
+                return;
+            }
+
+            this.physics.world.resume();
+            this.physics.world.timeScale = 0.35;
+            this.anims.globalTimeScale = 0.45;
+            this.player.playGrowthEffect();
+
+            this.time.delayedCall(GROWTH_SLOWMO_MS, () => {
+                if (!this.sys.isActive()) {
+                    return;
+                }
+
+                this.physics.world.timeScale = 1;
+                this.anims.globalTimeScale = 1;
+                this.isGrowthCinematicActive = false;
+            });
+        });
     }
 }

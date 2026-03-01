@@ -102,22 +102,7 @@ export class SettingsScene extends Scene {
             fontSize: 22,
             label: "",
             onClick: () => {
-                if (this.scale.isFullscreen) {
-                    this.scale.stopFullscreen();
-                } else {
-                    this.scale.startFullscreen();
-                    this.time.delayedCall(0, () => {
-                        if (this.scale.isFullscreen) {
-                            return;
-                        }
-
-                        const fullscreenTarget = this.game.canvas?.parentElement ?? this.game.canvas;
-                        void fullscreenTarget?.requestFullscreen?.();
-                    });
-                }
-
-                this.scale.refresh();
-                this.refreshUi();
+                void this.toggleFullscreen();
             }
         });
 
@@ -164,5 +149,30 @@ export class SettingsScene extends Scene {
         this.volumeText.setText(`${Math.round(this.settings.masterVolume * 100)}%`);
         this.muteButton.setLabel(this.settings.muted ? "Aç" : "Kapat");
         this.fullscreenButton.setLabel(this.scale.isFullscreen ? "Açık" : "Kapalı");
+    }
+
+    private async toggleFullscreen(): Promise<void> {
+        const fullscreenTarget = this.game.canvas?.parentElement ?? this.game.canvas ?? null;
+
+        try {
+            if (this.scale.isFullscreen) {
+                this.scale.stopFullscreen();
+            } else {
+                this.scale.startFullscreen();
+                if (!this.scale.isFullscreen && fullscreenTarget?.requestFullscreen) {
+                    await fullscreenTarget.requestFullscreen();
+                }
+            }
+        } catch {
+            try {
+                if (!this.scale.isFullscreen && fullscreenTarget?.requestFullscreen) {
+                    await fullscreenTarget.requestFullscreen();
+                }
+            } catch {
+                // Keep UI responsive even if browser blocks fullscreen request.
+            }
+        }
+
+        this.refreshUi();
     }
 }

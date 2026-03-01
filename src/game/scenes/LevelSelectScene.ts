@@ -6,7 +6,7 @@ import { gameState } from "../state/GameState";
 import { LevelId } from "../types/progression";
 import { createMenuButton, createMenuCard, createMenuLabel, drawMenuBackground, drawMenuHeader } from "../ui/menuTheme";
 
-const LEVEL_IDS: LevelId[] = [1, 2, 3];
+const LEVEL_IDS: LevelId[] = [1, 2, 3, 4];
 
 export class LevelSelectScene extends Scene {
     constructor() {
@@ -23,12 +23,12 @@ export class LevelSelectScene extends Scene {
         createMenuCard(this, { x: 874, y: 46, width: 280, height: 74, alpha: 0.94 });
         createMenuLabel(this, 874, 46, `Cüzdan: ${snapshot.profile.walletPoints} CP`, 24, "#ffe6a8");
 
-        createMenuCard(this, { x: 512, y: 566, width: 900, height: 356 });
+        createMenuCard(this, { x: 512, y: 552, width: 900, height: 404 });
 
         LEVEL_IDS.forEach((levelId, index) => {
             const level = getLevelById(levelId);
             const isPlayable = gameState.canPlayLevel(levelId);
-            const y = 464 + index * 86;
+            const y = 430 + index * 72;
 
             createMenuButton(this, {
                 x: 512,
@@ -52,16 +52,16 @@ export class LevelSelectScene extends Scene {
         });
 
         if (snapshot.profile.finaleSeen) {
-            createMenuLabel(this, 512, 656, "Final açıldı: tüm bölümler serbest.", 19, "#9de4ae");
+            createMenuLabel(this, 512, 694, "Final açıldı: tüm bölümler serbest.", 19, "#9de4ae");
         } else {
-            createMenuLabel(this, 512, 656, `Açık son bölüm: ${snapshot.profile.unlockedLevel}`, 19, "#9cdfff");
+            createMenuLabel(this, 512, 694, `Açık son bölüm: ${snapshot.profile.unlockedLevel}`, 19, "#9cdfff");
         }
 
         createMenuButton(this, {
             x: 512,
-            y: 730,
+            y: 738,
             width: 320,
-            height: 52,
+            height: 48,
             fontSize: 22,
             label: "Ana Menüye Dön",
             onClick: () => this.scene.start(SCENE_KEYS.MAIN_MENU)
@@ -73,7 +73,13 @@ export class LevelSelectScene extends Scene {
             return;
         }
 
-        gameState.startLevel(levelId);
-        this.scene.start(SCENE_KEYS.GAME, { levelId });
+        const snapshot = gameState.getSnapshot();
+        if (snapshot.profile.introSeen) {
+            gameState.startLevel(levelId);
+            this.scene.start(SCENE_KEYS.GAME, { levelId });
+            return;
+        }
+
+        this.scene.start(SCENE_KEYS.INTRO, { levelId });
     }
 }

@@ -1,4 +1,4 @@
-export type LevelId = 1 | 2 | 3;
+export type LevelId = 1 | 2 | 3 | 4;
 
 export type UpgradeKey =
     | "maxHp"
@@ -14,6 +14,7 @@ export interface ProfileState {
     selectedLevel: LevelId;
     walletPoints: number;
     upgrades: Record<UpgradeKey, number>;
+    introSeen: boolean;
     finaleSeen: boolean;
 }
 

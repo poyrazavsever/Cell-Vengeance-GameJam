@@ -2,6 +2,8 @@ import { Scene } from "phaser";
 import { ASSET_KEYS } from "../constants/assetKeys";
 import { SCENE_KEYS } from "../constants/sceneKeys";
 import { stopMenuMusic } from "../services/menuMusic";
+import { gameState } from "../state/GameState";
+import { LevelId } from "../types/progression";
 import { MenuButtonApi, createMenuButton } from "../ui/menuTheme";
 
 const FALLBACK_VIDEO_WIDTH = 1920;
@@ -10,21 +12,26 @@ const FALLBACK_VIDEO_HEIGHT = 1080;
 export class IntroScene extends Scene {
     private introVideo!: Phaser.GameObjects.Video;
     private backgroundRect!: Phaser.GameObjects.Rectangle;
-    private startButton!: MenuButtonApi;
     private skipButton!: MenuButtonApi;
-    private videoCompleted = false;
-    private introStarted = false;
     private transitioning = false;
+    private targetLevel: LevelId = 1;
 
     constructor() {
         super(SCENE_KEYS.INTRO);
+    }
+
+    init(data: { levelId?: LevelId } = {}): void {
+        const snapshot = gameState.getSnapshot();
+        const selectedLevel = data.levelId ?? snapshot.profile.selectedLevel;
+        this.targetLevel = gameState.canPlayLevel(selectedLevel) ? selectedLevel : snapshot.profile.unlockedLevel;
     }
 
     create(): void {
         stopMenuMusic(this);
 
         if (!this.cache.video.exists(ASSET_KEYS.INTRO_VIDEO)) {
-            this.scene.start(SCENE_KEYS.MAIN_MENU);
+            gameState.markIntroSeen();
+            this.scene.start(SCENE_KEYS.GAME, { levelId: this.targetLevel });
             return;
         }
 
@@ -38,22 +45,11 @@ export class IntroScene extends Scene {
         this.applyVideoLayout();
 
         this.introVideo.once("complete", () => {
-            this.videoCompleted = true;
-            this.goToMainMenu();
+            this.goToGame();
         });
         this.introVideo.on("metadata", () => {
             this.applyVideoLayout();
             this.configureVideoAudio();
-        });
-
-        this.startButton = createMenuButton(this, {
-            x: width * 0.5,
-            y: height - 90,
-            width: 380,
-            height: 62,
-            fontSize: 30,
-            label: "Oyuna Başla",
-            onClick: () => this.startIntroPlayback()
         });
 
         this.skipButton = createMenuButton(this, {
@@ -63,9 +59,9 @@ export class IntroScene extends Scene {
             height: 44,
             fontSize: 18,
             label: "Videoyu Geç",
-            onClick: () => this.goToMainMenu()
+            onClick: () => this.goToGame()
         });
-        this.skipButton.root.setVisible(false).setDepth(20);
+        this.skipButton.root.setVisible(true).setDepth(20);
 
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
             this.scale.off(Phaser.Scale.Events.RESIZE, this.handleResize, this);
@@ -76,13 +72,13 @@ export class IntroScene extends Scene {
 
         this.scale.on(Phaser.Scale.Events.RESIZE, this.handleResize, this);
         this.handleResize();
+        this.startIntroPlayback();
     }
 
     private handleResize(): void {
         const { width, height } = this.scale;
         this.backgroundRect.setPosition(width * 0.5, height * 0.5);
         this.backgroundRect.setSize(width, height);
-        this.startButton.root.setPosition(width * 0.5, height - 90);
         this.skipButton.root.setPosition(width - 96, height - 40);
         this.applyVideoLayout();
     }
@@ -97,13 +93,6 @@ export class IntroScene extends Scene {
     }
 
     private startIntroPlayback(): void {
-        if (this.introStarted) {
-            return;
-        }
-
-        this.introStarted = true;
-        this.startButton.root.setVisible(false);
-        this.skipButton.root.setVisible(true);
         this.introVideo.setVisible(true);
         this.tryPlayIntro();
     }
@@ -118,13 +107,14 @@ export class IntroScene extends Scene {
         });
     }
 
-    private goToMainMenu(): void {
+    private goToGame(): void {
         if (this.transitioning) {
             return;
         }
 
         this.transitioning = true;
-        this.scene.start(SCENE_KEYS.MAIN_MENU);
+        gameState.markIntroSeen();
+        this.scene.start(SCENE_KEYS.GAME, { levelId: this.targetLevel });
     }
 
     private configureVideoAudio(): void {

@@ -24,6 +24,17 @@ export interface EnemyConfig {
     attackHitbox?: AttackHitboxConfig;
     projectileSpeed?: number;
     projectileLifetime?: number;
+    burstShots?: number;
+    burstIntervalMs?: number;
+    burstStartDelayMs?: number;
+    meleeRange?: number;
+    specialMinRange?: number;
+    specialMaxRange?: number;
+    specialCooldownMs?: number;
+    summonCooldownMs?: number;
+    summonMaxAlive?: number;
+    jumpCooldownMs?: number;
+    jumpPower?: number;
     wobbleSpeed?: number;
     wobbleAmplitude?: number;
     vulnerableOnlyInRecover?: boolean;

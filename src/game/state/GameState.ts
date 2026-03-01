@@ -36,6 +36,7 @@ const DEFAULT_PROFILE: ProfileState = {
     selectedLevel: 1,
     walletPoints: 0,
     upgrades: { ...DEFAULT_UPGRADES },
+    introSeen: false,
     finaleSeen: false
 };
 
@@ -44,11 +45,11 @@ const clampLevelId = (value: number): LevelId => {
         return 1;
     }
 
-    if (value >= 3) {
-        return 3;
+    if (value >= 4) {
+        return 4;
     }
 
-    return 2;
+    return Math.floor(value) as LevelId;
 };
 
 const clampUpgradeLevel = (key: UpgradeKey, value: number): number => {
@@ -62,6 +63,7 @@ const cloneProfile = (profile: ProfileState): ProfileState => {
         selectedLevel: profile.selectedLevel,
         walletPoints: profile.walletPoints,
         upgrades: { ...profile.upgrades },
+        introSeen: profile.introSeen,
         finaleSeen: profile.finaleSeen
     };
 };
@@ -161,6 +163,17 @@ export class GameState {
         this.persistProfile();
         this.notify();
         return true;
+    }
+
+    markIntroSeen(): GameSnapshot {
+        if (this.profile.introSeen) {
+            return this.getSnapshot();
+        }
+
+        this.profile.introSeen = true;
+        this.persistProfile();
+        this.notify();
+        return this.getSnapshot();
     }
 
     addCellPoints(points: number): GameSnapshot {
@@ -297,14 +310,18 @@ export class GameState {
         return {
             maxHealth: 3 + this.profile.upgrades.maxHp,
             attackDamage: 1 + this.profile.upgrades.attack,
-            moveBase: 210 + this.profile.upgrades.moveSpeed * 20,
-            jumpPower: 560 + this.profile.upgrades.jumpPower * 25,
-            dashBonus: 120 + this.profile.upgrades.dashBoost * 25,
+            moveBase: 170 + this.profile.upgrades.moveSpeed * 15,
+            jumpPower: 500 + this.profile.upgrades.jumpPower * 20,
+            dashBonus: 80 + this.profile.upgrades.dashBoost * 15,
             canDash: this.profile.upgrades.dashBoost > 0
         };
     }
 
     canPlayLevel(levelId: LevelId): boolean {
+        if (levelId === 4) {
+            return true;
+        }
+
         if (this.profile.finaleSeen) {
             return true;
         }
@@ -333,7 +350,11 @@ export class GameState {
         const unlockedLevel = clampLevelId(Number(source.unlockedLevel ?? 1));
         const selectedLevel = clampLevelId(Number(source.selectedLevel ?? 1));
         const finaleSeen = Boolean(source.finaleSeen);
-        const safeSelectedLevel = !finaleSeen && selectedLevel > unlockedLevel ? unlockedLevel : selectedLevel;
+        const introSeen = Boolean((source as { introSeen?: unknown }).introSeen);
+        const safeSelectedLevel =
+            !finaleSeen && selectedLevel > unlockedLevel && selectedLevel !== 4
+                ? unlockedLevel
+                : selectedLevel;
 
         return {
             unlockedLevel,
@@ -346,6 +367,7 @@ export class GameState {
                 jumpPower: clampUpgradeLevel("jumpPower", Number(upgrades.jumpPower ?? 0)),
                 dashBoost: clampUpgradeLevel("dashBoost", Number(upgrades.dashBoost ?? 0))
             },
+            introSeen,
             finaleSeen
         };
     }

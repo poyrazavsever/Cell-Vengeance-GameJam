@@ -14,7 +14,8 @@ type ShootProjectileCallback = (
 ) => void;
 
 export class SpitterEnemy extends EnemyBase {
-    private hasFiredProjectile = false;
+    private burstShotsFired = 0;
+    private nextBurstShotAt = 0;
     private readonly baseScaleX: number;
     private readonly baseScaleY: number;
     private readonly shootProjectile: ShootProjectileCallback;
@@ -35,15 +36,20 @@ export class SpitterEnemy extends EnemyBase {
         this.shootProjectile = shootProjectile;
     }
 
-    handleBehavior(player: Player, time: number, delta: number): void {
+    handleBehavior(player: Player, time: number, _delta: number): void {
         switch (this.getState()) {
             case "patrol": {
                 this.playAnimation("patrol");
                 this.faceTowards(player.x);
-                const wobbleStep = (this.config.wobbleSpeed ?? 0.004) * delta;
-                const wobble = Math.sin((time + this.y * 3.2) * wobbleStep) * (this.config.wobbleAmplitude ?? 12);
-                this.setVelocityX(0);
-                this.setPosition(this.spawnX + wobble, this.spawnY);
+                const chaseDirection = player.x >= this.x ? 1 : -1;
+                this.setVelocityX(chaseDirection * this.config.patrolSpeed);
+                this.tryFollowPlayerVertical(player, time, {
+                    cooldownMs: 900,
+                    jumpPower: 430,
+                    minVerticalGap: 16,
+                    maxVerticalGap: 520,
+                    horizontalSpeed: this.config.patrolSpeed * 1.5
+                });
                 if (this.isPlayerInDetectRange(player)) {
                     this.setBehaviorState("detect", time);
                 }
@@ -53,7 +59,14 @@ export class SpitterEnemy extends EnemyBase {
             case "detect":
                 this.playAnimation("detect");
                 this.faceTowards(player.x);
-                this.setVelocityX(0);
+                this.setVelocityX(this.facingDirection * Math.max(16, this.config.patrolSpeed * 0.75));
+                this.tryFollowPlayerVertical(player, time, {
+                    cooldownMs: 900,
+                    jumpPower: 430,
+                    minVerticalGap: 16,
+                    maxVerticalGap: 520,
+                    horizontalSpeed: this.config.patrolSpeed * 1.4
+                });
                 if (this.getStateElapsed(time) >= 250) {
                     this.setBehaviorState("telegraph", time);
                 }
@@ -69,8 +82,11 @@ export class SpitterEnemy extends EnemyBase {
 
             case "attack":
                 this.setVelocityX(0);
-                if (!this.hasFiredProjectile && this.getStateElapsed(time) >= this.config.attackDuration * 0.35) {
-                    this.hasFiredProjectile = true;
+                if (
+                    this.burstShotsFired < (this.config.burstShots ?? 1)
+                    && time >= this.nextBurstShotAt
+                ) {
+                    this.burstShotsFired += 1;
                     this.shootProjectile(
                         this.x + this.facingDirection * 34,
                         this.y - 6,
@@ -80,6 +96,7 @@ export class SpitterEnemy extends EnemyBase {
                         this.config.projectileSpeed ?? 280,
                         this.config.projectileLifetime ?? 1800
                     );
+                    this.nextBurstShotAt = time + (this.config.burstIntervalMs ?? 170);
                 }
 
                 if (this.getStateElapsed(time) >= this.config.attackDuration) {
@@ -109,7 +126,8 @@ export class SpitterEnemy extends EnemyBase {
 
     protected onStateChanged(previousState: EnemyState, nextState: EnemyState): void {
         if (previousState === "attack" && nextState !== "attack") {
-            this.hasFiredProjectile = false;
+            this.burstShotsFired = 0;
+            this.nextBurstShotAt = 0;
         }
 
         if (nextState === "telegraph") {
@@ -124,6 +142,8 @@ export class SpitterEnemy extends EnemyBase {
             this.playEnemySfx("attack", 0.35);
             this.clearTint();
             this.setScale(this.baseScaleX, this.baseScaleY);
+            this.burstShotsFired = 0;
+            this.nextBurstShotAt = this.scene.time.now + (this.config.burstStartDelayMs ?? 140);
             return;
         }
 

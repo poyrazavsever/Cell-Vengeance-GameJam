@@ -2,6 +2,7 @@ import { Scene } from "phaser";
 import { SCENE_KEYS } from "../constants/sceneKeys";
 import { ensureMenuMusic } from "../services/menuMusic";
 import { gameState } from "../state/GameState";
+import { LevelId } from "../types/progression";
 import { createMenuButton, createMenuCard, createMenuLabel, drawMenuBackground, drawMenuHeader } from "../ui/menuTheme";
 
 export class MainMenuScene extends Scene {
@@ -27,7 +28,7 @@ export class MainMenuScene extends Scene {
             label: "Kaldığın Yerden Devam Et",
             onClick: () => {
                 const nextSnapshot = gameState.getSnapshot();
-                const targetLevel = nextSnapshot.profile.selectedLevel <= nextSnapshot.profile.unlockedLevel
+                const targetLevel = gameState.canPlayLevel(nextSnapshot.profile.selectedLevel)
                     ? nextSnapshot.profile.selectedLevel
                     : nextSnapshot.profile.unlockedLevel;
                 this.startLevel(targetLevel);
@@ -76,13 +77,19 @@ export class MainMenuScene extends Scene {
         }
     }
 
-    private startLevel(levelId: 1 | 2 | 3): void {
+    private startLevel(levelId: LevelId): void {
         if (!gameState.setSelectedLevel(levelId)) {
             return;
         }
 
-        gameState.startLevel(levelId);
-        this.scene.start(SCENE_KEYS.GAME, { levelId });
+        const snapshot = gameState.getSnapshot();
+        if (snapshot.profile.introSeen) {
+            gameState.startLevel(levelId);
+            this.scene.start(SCENE_KEYS.GAME, { levelId });
+            return;
+        }
+
+        this.scene.start(SCENE_KEYS.INTRO, { levelId });
     }
 
     private createWalletBadge(walletPoints: number): void {
