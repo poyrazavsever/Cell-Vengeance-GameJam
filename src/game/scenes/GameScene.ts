@@ -699,12 +699,6 @@ export class GameScene extends Scene {
             const pickupObject = pickup as Phaser.Physics.Arcade.Image;
             this.absorbPickup(pickupObject);
         });
-
-        this.time.addEvent({
-            delay: 1400,
-            loop: true,
-            callback: () => this.spawnPickup()
-        });
     }
 
     private createPlayerAttackHitbox(): void {
@@ -925,9 +919,10 @@ export class GameScene extends Scene {
             const pickup = this.pickups.create(
                 x + Phaser.Math.Between(-18, 18),
                 y - Phaser.Math.Between(4, 18),
-                "cell-point"
+                ASSET_KEYS.CELL_POINT
             ) as Phaser.Physics.Arcade.Image;
 
+            pickup.setScale(0.08);
             pickup.setBounce(0.3);
             pickup.setDrag(40, 0);
             pickup.setData("value", 1);
@@ -1023,11 +1018,6 @@ export class GameScene extends Scene {
         graphics.fillStyle(0xffffff, 1);
         graphics.fillRect(0, 0, 1, 1);
         graphics.generateTexture("platform-pixel", 1, 1);
-        graphics.clear();
-
-        graphics.fillStyle(0x75fff0, 1);
-        graphics.fillCircle(10, 10, 10);
-        graphics.generateTexture("cell-point", 20, 20);
         graphics.clear();
 
         graphics.fillStyle(0x87ffb9, 1);

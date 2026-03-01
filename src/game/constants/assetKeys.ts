@@ -6,6 +6,7 @@ export const ASSET_KEYS = {
     MAP_LEVEL_1: "map-level-1",
     MAP_LEVEL_2: "map-level-2",
     MAP_LEVEL_3: "map-level-3",
+    CELL_POINT: "cell-point-img",
     PLAYER_LEVEL_1: "player-level-1",
     ENEMY_SCOUT: "enemy-scout",
     ENEMY_SPITTER: "enemy-spitter",

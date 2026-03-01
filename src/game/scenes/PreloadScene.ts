@@ -64,6 +64,7 @@ export class PreloadScene extends Scene {
         this.load.text(TSX_CACHE_KEYS["background.tsx"], "maps/background.tsx");
         this.load.text(TSX_CACHE_KEYS["tiles.tsx"], "maps/tiles.tsx");
         this.load.text(TSX_CACHE_KEYS["objects.tsx"], "maps/objects.tsx");
+        this.load.image(ASSET_KEYS.CELL_POINT, "assets/cell.png");
         this.load.spritesheet(ASSET_KEYS.PLAYER_LEVEL_1, "assets/characters/1.png", { frameWidth: PLAYER_FRAME_SIZE, frameHeight: PLAYER_FRAME_SIZE });
         this.load.spritesheet(ASSET_KEYS.ENEMY_SCOUT, "assets/enemy/Scout.png", { frameWidth: ENEMY_FRAME_SIZE, frameHeight: ENEMY_FRAME_SIZE });
         this.load.spritesheet(ASSET_KEYS.ENEMY_SPITTER, "assets/enemy/Spitter.png", { frameWidth: ENEMY_FRAME_SIZE, frameHeight: ENEMY_FRAME_SIZE });
