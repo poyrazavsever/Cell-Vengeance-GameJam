@@ -73,7 +73,13 @@ export class LevelSelectScene extends Scene {
             return;
         }
 
-        gameState.startLevel(levelId);
-        this.scene.start(SCENE_KEYS.GAME, { levelId });
+        const snapshot = gameState.getSnapshot();
+        if (snapshot.profile.introSeen) {
+            gameState.startLevel(levelId);
+            this.scene.start(SCENE_KEYS.GAME, { levelId });
+            return;
+        }
+
+        this.scene.start(SCENE_KEYS.INTRO, { levelId });
     }
 }

@@ -31,9 +31,13 @@ export class LevelDoor {
             return false;
         }
 
-        const doorBounds = this.core.getBounds();
-        const activationBounds = Phaser.Geom.Rectangle.Inflate(doorBounds, 10, 8);
+        const activationBounds = this.getInteractionBounds();
         return Phaser.Geom.Intersects.RectangleToRectangle(playerBounds, activationBounds);
+    }
+
+    getInteractionBounds(): Phaser.Geom.Rectangle {
+        const doorBounds = this.core.getBounds();
+        return Phaser.Geom.Rectangle.Inflate(doorBounds, 24, 16);
     }
 
     destroy(): void {

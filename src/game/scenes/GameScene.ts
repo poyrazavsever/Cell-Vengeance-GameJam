@@ -59,6 +59,13 @@ type MapTileLookup = Record<string, MapTileLookupEntry>;
 const PLAYER_ATTACK_DURATION_MS = 160;
 const WORLD_HEIGHT = 800;
 const CAMERA_ZOOM = 1.45;
+const DOOR_BUFFER_MS = 180;
+const FALL_DAMAGE_THRESHOLD_Y = 760;
+const FALL_DAMAGE_AMOUNT = 1;
+const FALL_DAMAGE_LANDING_LOCK_MS = 160;
+const GROWTH_FREEZE_MS = 250;
+const GROWTH_SLOWMO_MS = 1100;
+const PICKUP_COLLECT_DELAY_MS = 320;
 const MAP_LAYER_NAMES = {
     background: ["Arkaplan"],
     mid: ["Arkaplan Onu", "Arkaplan Önü", "Arkaplan Objeler", "Üst katman"],
@@ -95,6 +102,12 @@ export class GameScene extends Scene {
     private confirmKey!: Phaser.Input.Keyboard.Key;
     private ladderZones!: Phaser.Physics.Arcade.StaticGroup;
     private playerOnLadder = false;
+    private doorProximityUntil = 0;
+    private enterBufferedUntil = 0;
+    private wasGroundedLastFrame = false;
+    private peakFallVelocity = 0;
+    private lastFallDamageAt = -Infinity;
+    private isGrowthCinematicActive = false;
 
     constructor() {
         super(SCENE_KEYS.GAME);
@@ -106,6 +119,16 @@ export class GameScene extends Scene {
         const levelId = gameState.canPlayLevel(requestedLevel) ? requestedLevel : snapshot.profile.unlockedLevel;
         this.level = getLevelById(levelId);
         this.currentMapAssetKey = this.resolveMapAssetKey(levelId);
+
+        // Scene instance is reused between level transitions, so runtime flags must be reset explicitly.
+        this.isCompletingLevel = false;
+        this.isGrowthCinematicActive = false;
+        this.doorProximityUntil = 0;
+        this.enterBufferedUntil = 0;
+        this.wasGroundedLastFrame = false;
+        this.peakFallVelocity = 0;
+        this.lastFallDamageAt = -Infinity;
+        this.previousGrowthStage = 0;
     }
 
     create(): void {
@@ -147,25 +170,39 @@ export class GameScene extends Scene {
 
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
             this.stopWalkSfx();
+            this.isGrowthCinematicActive = false;
+            if (this.physics?.world) {
+                this.physics.world.resume();
+                this.physics.world.timeScale = 1;
+            }
+            this.anims.globalTimeScale = 1;
             this.walkSound?.destroy();
             this.walkSound = null;
-            this.playerAttackHitbox.destroy();
-            this.levelDoor.destroy();
+            this.playerAttackHitbox?.destroy();
+            this.levelDoor?.destroy();
             this.unsubscribeState?.();
             this.unsubscribeState = null;
         });
     }
 
     update(time: number, delta: number): void {
-        this.handlePlayerInput();
-        this.updateDoorInteraction();
-        this.enemyManager.update(this.player, time, delta);
+        if (!this.isGrowthCinematicActive) {
+            this.handlePlayerInput();
+            this.updateDoorInteraction();
+            this.enemyManager.update(this.player, time, delta);
+        }
+
+        this.updateFallDamageTracking(time);
         this.updatePlayerAttackHitboxPosition();
         this.updateWalkSound();
         this.updateInvulnerabilityVisual(time);
     }
 
     private handlePlayerInput(): void {
+        if (this.isGrowthCinematicActive) {
+            return;
+        }
+
         const snapshot = gameState.getSnapshot();
         const stats = snapshot.stats;
         let direction = 0;
@@ -701,10 +738,13 @@ export class GameScene extends Scene {
             collideWorldBounds: true
         });
 
-        this.physics.add.collider(this.pickups, this.platforms);
+        this.physics.add.collider(this.pickups, this.platforms, (pickup) => {
+            const pickupObject = pickup as Phaser.Physics.Arcade.Image;
+            pickupObject.setData("groundedOnce", true);
+        });
         this.physics.add.overlap(this.player, this.pickups, (_player, pickup) => {
             const pickupObject = pickup as Phaser.Physics.Arcade.Image;
-            this.absorbPickup(pickupObject);
+            this.tryCollectPickup(pickupObject);
         });
     }
 
@@ -797,8 +837,7 @@ export class GameScene extends Scene {
             EventBus.emit(EVENT_KEYS.PROFILE_UPDATED, snapshot.profile);
 
             if (snapshot.run.growthStage > this.previousGrowthStage) {
-                this.player.playGrowthEffect();
-                this.cameras.main.shake(80, 0.0035);
+                this.startGrowthCinematic();
                 EventBus.emit(EVENT_KEYS.PLAYER_GROWTH_STAGE_CHANGED, snapshot);
             }
 
@@ -817,6 +856,9 @@ export class GameScene extends Scene {
         this.updatePlayerAttackHitboxPosition();
 
         this.time.delayedCall(PLAYER_ATTACK_DURATION_MS, () => {
+            if (!this.sys.isActive() || !this.playerAttackHitbox?.active) {
+                return;
+            }
             this.playerAttackActive = false;
             this.playerAttackHitboxBody.enable = false;
             this.playerAttackHitbox.setActive(false);
@@ -854,7 +896,12 @@ export class GameScene extends Scene {
         return true;
     }
 
-    private applyDamageToPlayer(amount: number, source: DamageSource, sourceX: number): void {
+    private applyDamageToPlayer(
+        amount: number,
+        source: DamageSource,
+        sourceX: number,
+        applyKnockback = true
+    ): void {
         const damageResult = gameState.applyPlayerDamage(amount, this.time.now);
         if (!damageResult.applied) {
             return;
@@ -870,8 +917,10 @@ export class GameScene extends Scene {
         this.player.playLockedAction("hit", 240);
         this.playSfxOnce(ASSET_KEYS.SFX_PLAYER_HIT, 0.4);
 
-        const knockbackDirection = this.player.x < sourceX ? -1 : 1;
-        this.player.applyKnockback(knockbackDirection * 220, -260);
+        if (applyKnockback) {
+            const knockbackDirection = this.player.x < sourceX ? -1 : 1;
+            this.player.applyKnockback(knockbackDirection * 220, -260);
+        }
 
         if (damageResult.dead) {
             this.handlePlayerDeath();
@@ -886,6 +935,9 @@ export class GameScene extends Scene {
         this.stopWalkSfx();
 
         this.time.delayedCall(260, () => {
+            if (!this.sys.isActive() || !this.player?.active) {
+                return;
+            }
             this.player.respawnAt(this.level.spawn.x, this.level.spawn.y);
             gameState.restorePlayerVitals();
         });
@@ -896,13 +948,20 @@ export class GameScene extends Scene {
             return;
         }
 
+        const now = this.time.now;
         const playerBounds = this.player.getBounds();
-        const canEnter = this.levelDoor.isPlayerInside(playerBounds);
+        if (this.levelDoor.isPlayerInside(playerBounds)) {
+            this.doorProximityUntil = now + DOOR_BUFFER_MS;
+        }
+
+        if (Input.Keyboard.JustDown(this.confirmKey)) {
+            this.enterBufferedUntil = now + DOOR_BUFFER_MS;
+        }
+
+        const canEnter = now <= this.doorProximityUntil;
         this.doorHintText.setVisible(canEnter);
 
-        // Allow both tap and hold so door entry is not frame-timing dependent.
-        const requestedEnter = Input.Keyboard.JustDown(this.confirmKey) || this.confirmKey.isDown;
-        if (canEnter && requestedEnter) {
+        if (canEnter && now <= this.enterBufferedUntil) {
             this.completeCurrentLevel();
         }
     }
@@ -933,33 +992,43 @@ export class GameScene extends Scene {
             pickup.setBounce(0.3);
             pickup.setDrag(40, 0);
             pickup.setData("value", 1);
+            this.initializePickupData(pickup);
             pickup.setVelocity(Phaser.Math.Between(-120, 120), Phaser.Math.Between(-240, -110));
         }
     }
 
-    private absorbPickup(pickup: Phaser.Physics.Arcade.Image): void {
-        if (!pickup.active || pickup.getData("absorbing")) {
+    private initializePickupData(pickup: Phaser.Physics.Arcade.Image): void {
+        pickup.setData("collectibleAt", this.time.now + PICKUP_COLLECT_DELAY_MS);
+        pickup.setData("groundedOnce", false);
+        pickup.setData("collecting", false);
+    }
+
+    private tryCollectPickup(pickup: Phaser.Physics.Arcade.Image): void {
+        if (!pickup.active || pickup.getData("collecting")) {
+            return;
+        }
+
+        const collectibleAt = (pickup.getData("collectibleAt") as number | undefined) ?? 0;
+        const groundedOnce = Boolean(pickup.getData("groundedOnce"));
+        if (!groundedOnce || this.time.now < collectibleAt) {
             return;
         }
 
         const value = pickup.getData("value") as number | undefined;
-        pickup.setData("absorbing", true);
+        pickup.setData("collecting", true);
         pickup.body?.stop();
         if (pickup.body instanceof Physics.Arcade.Body) {
             pickup.body.enable = false;
-            pickup.body.setAllowGravity(false);
         }
-        pickup.setVelocity(0, 0);
         pickup.setDepth(32);
 
         this.tweens.add({
             targets: pickup,
-            x: this.player.x,
-            y: this.player.y - 8,
-            scale: 0.2,
-            alpha: 0.25,
-            duration: Phaser.Math.Between(160, 220),
-            ease: "Sine.easeIn",
+            scaleX: pickup.scaleX * 1.18,
+            scaleY: pickup.scaleY * 1.18,
+            alpha: 0,
+            duration: 140,
+            ease: "Sine.easeOut",
             onComplete: () => {
                 pickup.destroy();
                 gameState.addCellPoints(value ?? 1);
@@ -968,6 +1037,11 @@ export class GameScene extends Scene {
     }
 
     private updateWalkSound(): void {
+        if (this.isGrowthCinematicActive) {
+            this.stopWalkSfx();
+            return;
+        }
+
         const onGround = Boolean(this.player.body?.blocked.down || this.player.body?.touching.down);
         const isWalkingOnGround = onGround && Math.abs(this.player.body?.velocity.x ?? 0) > 2;
         if (isWalkingOnGround) {
@@ -1007,29 +1081,39 @@ export class GameScene extends Scene {
         const graphics = this.add.graphics({ x: 0, y: 0 });
         graphics.setVisible(false);
 
-        graphics.fillStyle(0x2b5161, 1);
-        graphics.fillRoundedRect(0, 0, 620, 32, 10);
-        graphics.generateTexture("platform-lg", 620, 32);
+        if (!this.textures.exists("platform-lg")) {
+            graphics.fillStyle(0x2b5161, 1);
+            graphics.fillRoundedRect(0, 0, 620, 32, 10);
+            graphics.generateTexture("platform-lg", 620, 32);
+        }
         graphics.clear();
 
-        graphics.fillStyle(0x346a7f, 1);
-        graphics.fillRoundedRect(0, 0, 320, 28, 10);
-        graphics.generateTexture("platform-md", 320, 28);
+        if (!this.textures.exists("platform-md")) {
+            graphics.fillStyle(0x346a7f, 1);
+            graphics.fillRoundedRect(0, 0, 320, 28, 10);
+            graphics.generateTexture("platform-md", 320, 28);
+        }
         graphics.clear();
 
-        graphics.fillStyle(0x3f7f94, 1);
-        graphics.fillRoundedRect(0, 0, 200, 24, 10);
-        graphics.generateTexture("platform-sm", 200, 24);
+        if (!this.textures.exists("platform-sm")) {
+            graphics.fillStyle(0x3f7f94, 1);
+            graphics.fillRoundedRect(0, 0, 200, 24, 10);
+            graphics.generateTexture("platform-sm", 200, 24);
+        }
         graphics.clear();
 
-        graphics.fillStyle(0xffffff, 1);
-        graphics.fillRect(0, 0, 1, 1);
-        graphics.generateTexture("platform-pixel", 1, 1);
+        if (!this.textures.exists("platform-pixel")) {
+            graphics.fillStyle(0xffffff, 1);
+            graphics.fillRect(0, 0, 1, 1);
+            graphics.generateTexture("platform-pixel", 1, 1);
+        }
         graphics.clear();
 
-        graphics.fillStyle(0x87ffb9, 1);
-        graphics.fillCircle(8, 8, 8);
-        graphics.generateTexture("acid-projectile", 16, 16);
+        if (!this.textures.exists("acid-projectile")) {
+            graphics.fillStyle(0x87ffb9, 1);
+            graphics.fillCircle(8, 8, 8);
+            graphics.generateTexture("acid-projectile", 16, 16);
+        }
         graphics.destroy();
     }
 
@@ -1063,10 +1147,88 @@ export class GameScene extends Scene {
         const minX = Phaser.Math.Clamp(this.player.x + 240, 60, this.level.worldWidth - 80);
         const maxX = Phaser.Math.Clamp(this.player.x + 760, 80, this.level.worldWidth - 60);
         const spawnX = Phaser.Math.Between(Math.min(minX, maxX), Math.max(minX, maxX));
-        const pickup = this.pickups.create(spawnX, 20, "cell-point") as Phaser.Physics.Arcade.Image;
+        const pickup = this.pickups.create(spawnX, 20, ASSET_KEYS.CELL_POINT) as Phaser.Physics.Arcade.Image;
 
+        pickup.setScale(0.08);
         pickup.setBounce(0.25);
         pickup.setDrag(20, 0);
         pickup.setData("value", 2);
+        this.initializePickupData(pickup);
+    }
+
+    private updateFallDamageTracking(time: number): void {
+        if (this.isGrowthCinematicActive) {
+            this.wasGroundedLastFrame = false;
+            this.peakFallVelocity = 0;
+            return;
+        }
+
+        const body = this.player.body as Physics.Arcade.Body | null;
+        if (!body) {
+            return;
+        }
+
+        if (this.player.isClimbing()) {
+            this.wasGroundedLastFrame = false;
+            this.peakFallVelocity = 0;
+            return;
+        }
+
+        const grounded = this.isPlayerGrounded(body);
+        if (!grounded) {
+            this.peakFallVelocity = Math.max(this.peakFallVelocity, body.velocity.y);
+        } else if (!this.wasGroundedLastFrame) {
+            if (
+                this.peakFallVelocity >= FALL_DAMAGE_THRESHOLD_Y
+                && time - this.lastFallDamageAt >= FALL_DAMAGE_LANDING_LOCK_MS
+            ) {
+                this.lastFallDamageAt = time;
+                this.applyDamageToPlayer(FALL_DAMAGE_AMOUNT, "fall", this.player.x, false);
+            }
+            this.peakFallVelocity = 0;
+        } else {
+            this.peakFallVelocity = 0;
+        }
+
+        this.wasGroundedLastFrame = grounded;
+    }
+
+    private isPlayerGrounded(body: Physics.Arcade.Body): boolean {
+        return Boolean(body.blocked.down || body.touching.down);
+    }
+
+    private startGrowthCinematic(): void {
+        if (this.isGrowthCinematicActive || !this.player.active) {
+            return;
+        }
+
+        this.isGrowthCinematicActive = true;
+        this.playerAttackActive = false;
+        this.playerAttackHitboxBody.enable = false;
+        this.playerAttackHitbox.setActive(false);
+        this.stopWalkSfx();
+        this.cameras.main.shake(110, 0.0035);
+
+        this.physics.world.pause();
+        this.time.delayedCall(GROWTH_FREEZE_MS, () => {
+            if (!this.sys.isActive()) {
+                return;
+            }
+
+            this.physics.world.resume();
+            this.physics.world.timeScale = 0.35;
+            this.anims.globalTimeScale = 0.45;
+            this.player.playGrowthEffect();
+
+            this.time.delayedCall(GROWTH_SLOWMO_MS, () => {
+                if (!this.sys.isActive()) {
+                    return;
+                }
+
+                this.physics.world.timeScale = 1;
+                this.anims.globalTimeScale = 1;
+                this.isGrowthCinematicActive = false;
+            });
+        });
     }
 }

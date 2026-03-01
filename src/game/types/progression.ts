@@ -14,6 +14,7 @@ export interface ProfileState {
     selectedLevel: LevelId;
     walletPoints: number;
     upgrades: Record<UpgradeKey, number>;
+    introSeen: boolean;
     finaleSeen: boolean;
 }
 

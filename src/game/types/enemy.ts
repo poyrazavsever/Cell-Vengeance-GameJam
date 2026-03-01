@@ -24,6 +24,9 @@ export interface EnemyConfig {
     attackHitbox?: AttackHitboxConfig;
     projectileSpeed?: number;
     projectileLifetime?: number;
+    burstShots?: number;
+    burstIntervalMs?: number;
+    burstStartDelayMs?: number;
     wobbleSpeed?: number;
     wobbleAmplitude?: number;
     vulnerableOnlyInRecover?: boolean;

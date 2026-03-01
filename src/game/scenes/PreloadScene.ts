@@ -97,14 +97,14 @@ export class PreloadScene extends Scene {
             this.drawLoadingBar(0);
             this.load.once("complete", () => {
                 this.loadingBar.destroy();
-                this.scene.start(SCENE_KEYS.INTRO);
+                this.scene.start(SCENE_KEYS.MAIN_MENU);
             });
             this.load.start();
             return;
         }
 
         this.loadingBar.destroy();
-        this.scene.start(SCENE_KEYS.INTRO);
+        this.scene.start(SCENE_KEYS.MAIN_MENU);
     }
 
     private drawLoadingBar(progress: number): void {

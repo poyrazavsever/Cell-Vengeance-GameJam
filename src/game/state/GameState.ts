@@ -36,6 +36,7 @@ const DEFAULT_PROFILE: ProfileState = {
     selectedLevel: 1,
     walletPoints: 0,
     upgrades: { ...DEFAULT_UPGRADES },
+    introSeen: false,
     finaleSeen: false
 };
 
@@ -62,6 +63,7 @@ const cloneProfile = (profile: ProfileState): ProfileState => {
         selectedLevel: profile.selectedLevel,
         walletPoints: profile.walletPoints,
         upgrades: { ...profile.upgrades },
+        introSeen: profile.introSeen,
         finaleSeen: profile.finaleSeen
     };
 };
@@ -161,6 +163,17 @@ export class GameState {
         this.persistProfile();
         this.notify();
         return true;
+    }
+
+    markIntroSeen(): GameSnapshot {
+        if (this.profile.introSeen) {
+            return this.getSnapshot();
+        }
+
+        this.profile.introSeen = true;
+        this.persistProfile();
+        this.notify();
+        return this.getSnapshot();
     }
 
     addCellPoints(points: number): GameSnapshot {
@@ -333,6 +346,7 @@ export class GameState {
         const unlockedLevel = clampLevelId(Number(source.unlockedLevel ?? 1));
         const selectedLevel = clampLevelId(Number(source.selectedLevel ?? 1));
         const finaleSeen = Boolean(source.finaleSeen);
+        const introSeen = Boolean((source as { introSeen?: unknown }).introSeen);
         const safeSelectedLevel = !finaleSeen && selectedLevel > unlockedLevel ? unlockedLevel : selectedLevel;
 
         return {
@@ -346,6 +360,7 @@ export class GameState {
                 jumpPower: clampUpgradeLevel("jumpPower", Number(upgrades.jumpPower ?? 0)),
                 dashBoost: clampUpgradeLevel("dashBoost", Number(upgrades.dashBoost ?? 0))
             },
+            introSeen,
             finaleSeen
         };
     }

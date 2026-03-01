@@ -14,7 +14,8 @@ type ShootProjectileCallback = (
 ) => void;
 
 export class SpitterEnemy extends EnemyBase {
-    private hasFiredProjectile = false;
+    private burstShotsFired = 0;
+    private nextBurstShotAt = 0;
     private readonly baseScaleX: number;
     private readonly baseScaleY: number;
     private readonly shootProjectile: ShootProjectileCallback;
@@ -69,8 +70,11 @@ export class SpitterEnemy extends EnemyBase {
 
             case "attack":
                 this.setVelocityX(0);
-                if (!this.hasFiredProjectile && this.getStateElapsed(time) >= this.config.attackDuration * 0.35) {
-                    this.hasFiredProjectile = true;
+                if (
+                    this.burstShotsFired < (this.config.burstShots ?? 1)
+                    && time >= this.nextBurstShotAt
+                ) {
+                    this.burstShotsFired += 1;
                     this.shootProjectile(
                         this.x + this.facingDirection * 34,
                         this.y - 6,
@@ -80,6 +84,7 @@ export class SpitterEnemy extends EnemyBase {
                         this.config.projectileSpeed ?? 280,
                         this.config.projectileLifetime ?? 1800
                     );
+                    this.nextBurstShotAt = time + (this.config.burstIntervalMs ?? 170);
                 }
 
                 if (this.getStateElapsed(time) >= this.config.attackDuration) {
@@ -109,7 +114,8 @@ export class SpitterEnemy extends EnemyBase {
 
     protected onStateChanged(previousState: EnemyState, nextState: EnemyState): void {
         if (previousState === "attack" && nextState !== "attack") {
-            this.hasFiredProjectile = false;
+            this.burstShotsFired = 0;
+            this.nextBurstShotAt = 0;
         }
 
         if (nextState === "telegraph") {
@@ -124,6 +130,8 @@ export class SpitterEnemy extends EnemyBase {
             this.playEnemySfx("attack", 0.35);
             this.clearTint();
             this.setScale(this.baseScaleX, this.baseScaleY);
+            this.burstShotsFired = 0;
+            this.nextBurstShotAt = this.scene.time.now + (this.config.burstStartDelayMs ?? 140);
             return;
         }
 
