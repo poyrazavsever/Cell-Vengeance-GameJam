@@ -18,6 +18,7 @@ import { SpawnPoint } from "../types/enemy";
 import { LevelDefinition } from "../types/level";
 import { LevelId } from "../types/progression";
 import { createMenuButton, createMenuCard, createMenuLabel } from "../ui/menuTheme";
+import { TutorialManager } from "../systems/TutorialManager";
 
 interface MovementKeys extends Phaser.Types.Input.Keyboard.CursorKeys {
     leftAlt: Phaser.Input.Keyboard.Key;
@@ -120,6 +121,7 @@ export class GameScene extends Scene {
     private bossEnemy: EnemyBase | null = null;
     private bossDoorOpened = false;
     private lastBossHealth = -1;
+    private tutorialManager: TutorialManager | null = null;
 
     constructor() {
         super(SCENE_KEYS.GAME);
@@ -201,7 +203,24 @@ export class GameScene extends Scene {
             this.levelDoor?.destroy();
             this.unsubscribeState?.();
             this.unsubscribeState = null;
+            this.tutorialManager?.destroy();
+            this.tutorialManager = null;
         });
+
+        // Start tutorial for Level 1
+        if (this.level.id === 1) {
+            this.tutorialManager = new TutorialManager(this, {
+                onPause: () => {
+                    this.physics.world.pause();
+                    this.player.setVelocity(0, 0);
+                    this.stopWalkSfx();
+                },
+                onResume: () => {
+                    this.physics.world.resume();
+                },
+                getPlayerX: () => this.player.x
+            });
+        }
     }
 
     update(time: number, delta: number): void {
@@ -211,14 +230,24 @@ export class GameScene extends Scene {
             return;
         }
 
-        if (!this.isGrowthCinematicActive) {
-            this.handlePlayerInput();
-            this.updateDoorInteraction();
-            this.enemyManager.update(this.player, time, delta);
+        // Tutorial must be checked FIRST so it can capture Enter key before door interaction.
+        if (this.tutorialManager) {
+            this.tutorialManager.update();
+            if (this.tutorialManager.isActive()) {
+                return;
+            }
         }
 
-        this.updateBossHealthHud();
+        if (this.isGrowthCinematicActive) {
+            this.updateBossHealthHud();
+            this.updatePlayerAttackHitboxPosition();
+            return;
+        }
 
+        this.handlePlayerInput();
+        this.updateDoorInteraction();
+        this.enemyManager.update(this.player, time, delta);
+        this.updateBossHealthHud();
         this.updateFallDamageTracking(time);
         this.updatePlayerAttackHitboxPosition();
         this.updateWalkSound();
@@ -652,6 +681,7 @@ export class GameScene extends Scene {
             if (enemy.kind === "boss") {
                 this.handleBossDefeated();
             }
+            this.tutorialManager?.onEnemyKilled();
         });
 
         this.bossEnemy = this.enemyManager.getBoss();
