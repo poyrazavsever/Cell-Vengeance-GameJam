@@ -4,11 +4,23 @@ import { ensureMenuMusic } from "../services/menuMusic";
 import { applySettingsToSoundManager, clampSettingsVolume, getDefaultSettings, loadSettings, saveSettings, SettingsState } from "../services/settings";
 import { MenuButtonApi, createMenuButton, createMenuCard, createMenuLabel, drawMenuBackground, drawMenuHeader } from "../ui/menuTheme";
 
+type FullscreenCapableElement = HTMLElement & {
+    webkitRequestFullscreen?: () => Promise<void> | void;
+};
+
+type FullscreenCapableDocument = Document & {
+    webkitFullscreenElement?: Element | null;
+    webkitExitFullscreen?: () => Promise<void> | void;
+};
+
 export class SettingsScene extends Scene {
     private settings: SettingsState = getDefaultSettings();
     private volumeText!: Phaser.GameObjects.Text;
     private muteButton!: MenuButtonApi;
     private fullscreenButton!: MenuButtonApi;
+    private readonly onBrowserFullscreenChanged = () => {
+        this.refreshUi();
+    };
 
     constructor() {
         super(SCENE_KEYS.SETTINGS);
@@ -122,9 +134,13 @@ export class SettingsScene extends Scene {
 
         this.scale.on(Phaser.Scale.Events.ENTER_FULLSCREEN, this.refreshUi, this);
         this.scale.on(Phaser.Scale.Events.LEAVE_FULLSCREEN, this.refreshUi, this);
+        document.addEventListener("fullscreenchange", this.onBrowserFullscreenChanged);
+        document.addEventListener("webkitfullscreenchange", this.onBrowserFullscreenChanged as EventListener);
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
             this.scale.off(Phaser.Scale.Events.ENTER_FULLSCREEN, this.refreshUi, this);
             this.scale.off(Phaser.Scale.Events.LEAVE_FULLSCREEN, this.refreshUi, this);
+            document.removeEventListener("fullscreenchange", this.onBrowserFullscreenChanged);
+            document.removeEventListener("webkitfullscreenchange", this.onBrowserFullscreenChanged as EventListener);
         });
 
         this.refreshUi();
@@ -146,33 +162,98 @@ export class SettingsScene extends Scene {
     }
 
     private refreshUi(): void {
+        if (!this.volumeText || !this.muteButton || !this.fullscreenButton) {
+            return;
+        }
+
         this.volumeText.setText(`${Math.round(this.settings.masterVolume * 100)}%`);
         this.muteButton.setLabel(this.settings.muted ? "Aç" : "Kapat");
-        this.fullscreenButton.setLabel(this.scale.isFullscreen ? "Açık" : "Kapalı");
+        this.fullscreenButton.setLabel(this.isFullscreenActive() ? "Açık" : "Kapalı");
     }
 
     private async toggleFullscreen(): Promise<void> {
-        const fullscreenTarget = this.game.canvas?.parentElement ?? this.game.canvas ?? null;
+        const fullscreenTarget = this.getFullscreenTarget();
+
+        if (this.isFullscreenActive()) {
+            this.exitFullscreen();
+        } else {
+            await this.enterFullscreen(fullscreenTarget);
+        }
+
+        this.time.delayedCall(0, () => {
+            this.scale.refresh();
+            this.refreshUi();
+        });
+    }
+
+    private isFullscreenActive(): boolean {
+        const doc = document as FullscreenCapableDocument;
+        return this.scale.isFullscreen || Boolean(doc.fullscreenElement || doc.webkitFullscreenElement);
+    }
+
+    private getFullscreenTarget(): FullscreenCapableElement | null {
+        const fromScale = (this.scale.fullscreenTarget ?? null) as FullscreenCapableElement | null;
+        if (fromScale) {
+            return fromScale;
+        }
+
+        return (this.game.canvas?.parentElement as FullscreenCapableElement | null)
+            ?? (this.game.canvas as FullscreenCapableElement | null)
+            ?? (document.getElementById("app") as FullscreenCapableElement | null)
+            ?? document.documentElement as FullscreenCapableElement;
+    }
+
+    private async enterFullscreen(target: FullscreenCapableElement | null): Promise<void> {
+        if (!target) {
+            return;
+        }
+
+        try {
+            this.scale.startFullscreen();
+        } catch {
+            // Phaser call failed; native fallback below.
+        }
+
+        if (this.isFullscreenActive()) {
+            return;
+        }
+
+        try {
+            if (typeof target.requestFullscreen === "function") {
+                await target.requestFullscreen();
+                return;
+            }
+
+            if (typeof target.webkitRequestFullscreen === "function") {
+                await target.webkitRequestFullscreen();
+            }
+        } catch {
+            // Browser can block fullscreen request when gesture is invalid; keep UI stable.
+        }
+    }
+
+    private exitFullscreen(): void {
+        const doc = document as FullscreenCapableDocument;
 
         try {
             if (this.scale.isFullscreen) {
                 this.scale.stopFullscreen();
-            } else {
-                this.scale.startFullscreen();
-                if (!this.scale.isFullscreen && fullscreenTarget?.requestFullscreen) {
-                    await fullscreenTarget.requestFullscreen();
-                }
             }
         } catch {
-            try {
-                if (!this.scale.isFullscreen && fullscreenTarget?.requestFullscreen) {
-                    await fullscreenTarget.requestFullscreen();
-                }
-            } catch {
-                // Keep UI responsive even if browser blocks fullscreen request.
-            }
+            // Phaser exit failed; native fallback below.
         }
 
-        this.refreshUi();
+        if (!doc.fullscreenElement && !doc.webkitFullscreenElement) {
+            return;
+        }
+
+        if (typeof doc.exitFullscreen === "function") {
+            void doc.exitFullscreen();
+            return;
+        }
+
+        if (typeof doc.webkitExitFullscreen === "function") {
+            void doc.webkitExitFullscreen();
+        }
     }
 }

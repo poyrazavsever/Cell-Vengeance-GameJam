@@ -116,6 +116,7 @@ export class GameScene extends Scene {
     private isGrowthCinematicActive = false;
     private isDeathSequenceActive = false;
     private deathUiObjects: Phaser.GameObjects.GameObject[] = [];
+    private deathKeyBindings: Array<{ event: string; handler: () => void }> = [];
     private bossEnemy: EnemyBase | null = null;
     private bossDoorOpened = false;
     private lastBossHealth = -1;
@@ -1090,8 +1091,7 @@ export class GameScene extends Scene {
         const backdrop = this.add
             .rectangle(width * 0.5, height * 0.5, width, height, 0x000000, 0.72)
             .setScrollFactor(0)
-            .setDepth(220)
-            .setInteractive();
+            .setDepth(220);
 
         const card = createMenuCard(this, { x: width * 0.5, y: height * 0.5, width: 520, height: 320, alpha: 0.96 });
         card.setScrollFactor(0).setDepth(221);
@@ -1131,11 +1131,26 @@ export class GameScene extends Scene {
         mainMenuButton.root.setScrollFactor(0).setDepth(222);
 
         this.deathUiObjects = [backdrop, card, title, subtitle, restartButton.root, mainMenuButton.root];
+
+        const restartHandler = () => this.restartLevelAfterDeath();
+        const menuHandler = () => this.returnToMainMenuAfterDeath();
+        this.deathKeyBindings = [
+            { event: "keydown-ENTER", handler: restartHandler },
+            { event: "keydown-R", handler: restartHandler },
+            { event: "keydown-ESC", handler: menuHandler }
+        ];
+        this.deathKeyBindings.forEach(({ event, handler }) => {
+            this.input.keyboard?.once(event, handler);
+        });
     }
 
     private clearDeathModal(): void {
         this.deathUiObjects.forEach((object) => object.destroy());
         this.deathUiObjects = [];
+        this.deathKeyBindings.forEach(({ event, handler }) => {
+            this.input.keyboard?.off(event, handler);
+        });
+        this.deathKeyBindings = [];
     }
 
     private restartLevelAfterDeath(): void {
