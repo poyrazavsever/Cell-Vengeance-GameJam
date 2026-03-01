@@ -1,6 +1,6 @@
 import { Physics, Scene } from "phaser";
 import { EnemyAnimationAction, getEnemyAnimationKey, getEnemyTextureKey } from "../../animations/enemyAnimations";
-import { ENEMY_SFX_KEYS, EnemySfxAction } from "../../constants/assetKeys";
+import { ASSET_KEYS, ENEMY_SFX_KEYS, EnemySfxAction } from "../../constants/assetKeys";
 import { DamageSource, EnemyKind, EnemyState } from "../../types/combat";
 import { AttackHitboxConfig, EnemyConfig } from "../../types/enemy";
 import { Player } from "../player/Player";
@@ -287,11 +287,11 @@ export abstract class EnemyBase extends Physics.Arcade.Sprite {
     }
 
     private spawnDeathBurst(): void {
-        if (!this.scene.textures.exists("cell-point")) {
+        if (!this.scene.textures.exists(ASSET_KEYS.CELL_POINT)) {
             return;
         }
 
-        const particles = this.scene.add.particles(this.x, this.y, "cell-point", {
+        const particles = this.scene.add.particles(this.x, this.y, ASSET_KEYS.CELL_POINT, {
             lifespan: 260,
             speed: { min: 80, max: 180 },
             scale: { start: 0.55, end: 0 },

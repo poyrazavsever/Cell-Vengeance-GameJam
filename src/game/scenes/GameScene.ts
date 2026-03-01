@@ -702,12 +702,6 @@ export class GameScene extends Scene {
             pickupObject.destroy();
             gameState.addCellPoints(value ?? 1);
         });
-
-        this.time.addEvent({
-            delay: 1400,
-            loop: true,
-            callback: () => this.spawnPickup()
-        });
     }
 
     private createPlayerAttackHitbox(): void {
@@ -925,9 +919,10 @@ export class GameScene extends Scene {
             const pickup = this.pickups.create(
                 x + Phaser.Math.Between(-18, 18),
                 y - Phaser.Math.Between(4, 18),
-                "cell-point"
+                ASSET_KEYS.CELL_POINT
             ) as Phaser.Physics.Arcade.Image;
 
+            pickup.setScale(0.08);
             pickup.setBounce(0.3);
             pickup.setDrag(40, 0);
             pickup.setData("value", 1);
@@ -995,11 +990,6 @@ export class GameScene extends Scene {
         graphics.generateTexture("platform-pixel", 1, 1);
         graphics.clear();
 
-        graphics.fillStyle(0x75fff0, 1);
-        graphics.fillCircle(10, 10, 10);
-        graphics.generateTexture("cell-point", 20, 20);
-        graphics.clear();
-
         graphics.fillStyle(0x87ffb9, 1);
         graphics.fillCircle(8, 8, 8);
         graphics.generateTexture("acid-projectile", 16, 16);
@@ -1035,8 +1025,9 @@ export class GameScene extends Scene {
         const minX = Phaser.Math.Clamp(this.player.x + 240, 60, this.level.worldWidth - 80);
         const maxX = Phaser.Math.Clamp(this.player.x + 760, 80, this.level.worldWidth - 60);
         const spawnX = Phaser.Math.Between(Math.min(minX, maxX), Math.max(minX, maxX));
-        const pickup = this.pickups.create(spawnX, 20, "cell-point") as Phaser.Physics.Arcade.Image;
+        const pickup = this.pickups.create(spawnX, 20, ASSET_KEYS.CELL_POINT) as Phaser.Physics.Arcade.Image;
 
+        pickup.setScale(0.08);
         pickup.setBounce(0.25);
         pickup.setDrag(20, 0);
         pickup.setData("value", 2);
