@@ -5,6 +5,7 @@ import { EnemyConfig } from "../../types/enemy";
 
 export class ScoutEnemy extends EnemyBase {
     private hasCommittedAttack = false;
+    private attacksSinceCalm = 0;
     private readonly baseScaleX: number;
     private readonly baseScaleY: number;
 
@@ -90,6 +91,19 @@ export class ScoutEnemy extends EnemyBase {
             case "recover":
                 this.setVelocityX(0);
                 if (this.getStateElapsed(time) >= this.config.recoverDuration) {
+                    const calmAfterAttacks = this.config.calmAfterAttacks ?? 2;
+                    if (this.attacksSinceCalm >= calmAfterAttacks) {
+                        this.setBehaviorState("calm", time);
+                    } else {
+                        this.setBehaviorState("patrol", time);
+                    }
+                }
+                break;
+
+            case "calm":
+                this.setVelocityX(0);
+                if (this.getStateElapsed(time) >= (this.config.calmDuration ?? 1400)) {
+                    this.attacksSinceCalm = 0;
                     this.setBehaviorState("patrol", time);
                 }
                 break;
@@ -110,6 +124,7 @@ export class ScoutEnemy extends EnemyBase {
         if (previousState === "attack" && nextState !== "attack") {
             this.disableAttackHitbox();
             this.hasCommittedAttack = false;
+            this.attacksSinceCalm += 1;
         }
 
         if (nextState === "telegraph") {
@@ -131,6 +146,13 @@ export class ScoutEnemy extends EnemyBase {
             this.playAnimation("recover");
             this.clearTint();
             this.setScale(this.baseScaleX, this.baseScaleY);
+            return;
+        }
+
+        if (nextState === "calm") {
+            this.playAnimation("recover");
+            this.setTint(0x80b7ff);
+            this.setScale(this.baseScaleX * 0.96, this.baseScaleY * 0.96);
             return;
         }
 

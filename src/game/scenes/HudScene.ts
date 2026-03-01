@@ -21,6 +21,8 @@ export class HudScene extends Scene {
     private infoGrowthNameText!: Phaser.GameObjects.Text;
     private infoGrowthDescText!: Phaser.GameObjects.Text;
     private infoCollectedText!: Phaser.GameObjects.Text;
+    private infoTotalCellsText!: Phaser.GameObjects.Text;
+    private infoGrowthSpentText!: Phaser.GameObjects.Text;
     private infoResidualText!: Phaser.GameObjects.Text;
     private infoHpText!: Phaser.GameObjects.Text;
     private infoAtkText!: Phaser.GameObjects.Text;
@@ -143,7 +145,7 @@ export class HudScene extends Scene {
     private createInfoPanel(): void {
         const { width, height } = this.scale;
         const panelW = 400;
-        const panelH = 480;
+        const panelH = 540;
         const px = (width - panelW) * 0.5;
         const py = (height - panelH) * 0.5;
 
@@ -195,23 +197,31 @@ export class HudScene extends Scene {
         this.infoCollectedText = this.make.text({ x: rightCol, y: rowY, text: "0", style: valueStyle, origin: { x: 1, y: 0 }, add: false });
         rowY += 30;
 
-        const lbl4 = this.make.text({ x: leftCol, y: rowY, text: "Artan Hücre:", style: labelStyle, add: false });
+        const lbl4 = this.make.text({ x: leftCol, y: rowY, text: "Toplam Hücre:", style: labelStyle, add: false });
+        this.infoTotalCellsText = this.make.text({ x: rightCol, y: rowY, text: "0", style: valueStyle, origin: { x: 1, y: 0 }, add: false });
+        rowY += 30;
+
+        const lbl5 = this.make.text({ x: leftCol, y: rowY, text: "Büyümeye Harcanan:", style: labelStyle, add: false });
+        this.infoGrowthSpentText = this.make.text({ x: rightCol, y: rowY, text: "0", style: valueStyle, origin: { x: 1, y: 0 }, add: false });
+        rowY += 30;
+
+        const lbl6 = this.make.text({ x: leftCol, y: rowY, text: "Artan Hücre:", style: labelStyle, add: false });
         this.infoResidualText = this.make.text({ x: rightCol, y: rowY, text: "0", style: valueStyle, origin: { x: 1, y: 0 }, add: false });
         rowY += 30;
 
-        const lbl5 = this.make.text({ x: leftCol, y: rowY, text: "Can:", style: labelStyle, add: false });
+        const lbl7 = this.make.text({ x: leftCol, y: rowY, text: "Can:", style: labelStyle, add: false });
         this.infoHpText = this.make.text({ x: rightCol, y: rowY, text: "3/3", style: valueStyle, origin: { x: 1, y: 0 }, add: false });
         rowY += 30;
 
-        const lbl6 = this.make.text({ x: leftCol, y: rowY, text: "Saldırı Gücü:", style: labelStyle, add: false });
+        const lbl8 = this.make.text({ x: leftCol, y: rowY, text: "Saldırı Gücü:", style: labelStyle, add: false });
         this.infoAtkText = this.make.text({ x: rightCol, y: rowY, text: "1", style: valueStyle, origin: { x: 1, y: 0 }, add: false });
         rowY += 30;
 
-        const lbl7 = this.make.text({ x: leftCol, y: rowY, text: "Hareket Hızı:", style: labelStyle, add: false });
+        const lbl9 = this.make.text({ x: leftCol, y: rowY, text: "Hareket Hızı:", style: labelStyle, add: false });
         this.infoSpeedText = this.make.text({ x: rightCol, y: rowY, text: "210", style: valueStyle, origin: { x: 1, y: 0 }, add: false });
         rowY += 30;
 
-        const lbl8 = this.make.text({ x: leftCol, y: rowY, text: "Atılma (Dash):", style: labelStyle, add: false });
+        const lbl10 = this.make.text({ x: leftCol, y: rowY, text: "Atılma (Dash):", style: labelStyle, add: false });
         this.infoDashText = this.make.text({ x: rightCol, y: rowY, text: "Kapalı", style: valueStyle, origin: { x: 1, y: 0 }, add: false });
         rowY += 36;
 
@@ -267,11 +277,13 @@ export class HudScene extends Scene {
             lbl1, this.infoGrowthText,
             lbl2, this.infoGrowthNameText, this.infoGrowthDescText,
             lbl3, this.infoCollectedText,
-            lbl4, this.infoResidualText,
-            lbl5, this.infoHpText,
-            lbl6, this.infoAtkText,
-            lbl7, this.infoSpeedText,
-            lbl8, this.infoDashText,
+            lbl4, this.infoTotalCellsText,
+            lbl5, this.infoGrowthSpentText,
+            lbl6, this.infoResidualText,
+            lbl7, this.infoHpText,
+            lbl8, this.infoAtkText,
+            lbl9, this.infoSpeedText,
+            lbl10, this.infoDashText,
             sep2, controlsText,
             btnBg, btnText, btnHitArea,
             hintText
@@ -357,11 +369,13 @@ export class HudScene extends Scene {
     }
 
     private refreshInfoPanel(snapshot: GameSnapshot): void {
-        const growthInfo = GROWTH_STAGE_INFO.find((stage) => stage.stage === snapshot.run.growthStage);
-        this.infoGrowthText.setText(`Aşama ${snapshot.run.growthStage}`);
+        const growthInfo = GROWTH_STAGE_INFO.find((stage) => stage.stage === snapshot.profile.growthStage);
+        this.infoGrowthText.setText(`Aşama ${snapshot.profile.growthStage}`);
         this.infoGrowthNameText.setText(growthInfo?.label ?? "Temel Hücre");
         this.infoGrowthDescText.setText(growthInfo?.description ?? "");
         this.infoCollectedText.setText(`${snapshot.run.collectedCells}`);
+        this.infoTotalCellsText.setText(`${snapshot.profile.totalAbsorbedCells}`);
+        this.infoGrowthSpentText.setText(`${snapshot.run.growthSpentInLevel}`);
         this.infoResidualText.setText(`${snapshot.run.residualCells}`);
         this.infoHpText.setText(`${snapshot.run.health}/${snapshot.run.maxHealth}`);
         this.infoAtkText.setText(`${snapshot.stats.attackDamage}`);

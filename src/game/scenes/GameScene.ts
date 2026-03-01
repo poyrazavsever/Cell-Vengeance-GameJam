@@ -140,7 +140,7 @@ export class GameScene extends Scene {
         this.wasGroundedLastFrame = false;
         this.peakFallVelocity = 0;
         this.lastFallDamageAt = -Infinity;
-        this.previousGrowthStage = 0;
+        this.previousGrowthStage = snapshot.profile.growthStage;
         this.isDeathSequenceActive = false;
         this.clearDeathModal();
         this.bossEnemy = null;
@@ -938,23 +938,25 @@ export class GameScene extends Scene {
                 return;
             }
 
-            this.player.setGrowthStage(snapshot.run.growthStage);
+            this.player.setGrowthStage(snapshot.profile.growthStage);
             this.attackDamage = snapshot.stats.attackDamage;
 
             this.registry.set("collectedCells", snapshot.run.collectedCells);
             this.registry.set("residualCells", snapshot.run.residualCells);
+            this.registry.set("growthSpentInLevel", snapshot.run.growthSpentInLevel);
+            this.registry.set("totalAbsorbedCells", snapshot.profile.totalAbsorbedCells);
             this.registry.set("health", snapshot.run.health);
             this.registry.set("wallet", snapshot.profile.walletPoints);
 
             EventBus.emit(EVENT_KEYS.PLAYER_PROGRESS_UPDATED, snapshot);
             EventBus.emit(EVENT_KEYS.PROFILE_UPDATED, snapshot.profile);
 
-            if (snapshot.run.growthStage > this.previousGrowthStage) {
+            if (snapshot.profile.growthStage > this.previousGrowthStage) {
                 this.startGrowthCinematic();
                 EventBus.emit(EVENT_KEYS.PLAYER_GROWTH_STAGE_CHANGED, snapshot);
             }
 
-            this.previousGrowthStage = snapshot.run.growthStage;
+            this.previousGrowthStage = snapshot.profile.growthStage;
         });
     }
 
