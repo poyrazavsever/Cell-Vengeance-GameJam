@@ -60,6 +60,7 @@ export class PreloadScene extends Scene {
         this.load.text(MAP1_TSX_KEYS["background.tsx"], "maps/background.tsx");
         this.load.text(MAP1_TSX_KEYS["tiles.tsx"], "maps/tiles.tsx");
         this.load.text(MAP1_TSX_KEYS["objects.tsx"], "maps/objects.tsx");
+        this.load.image(ASSET_KEYS.CELL_POINT, "assets/hucre.png");
         this.load.spritesheet(ASSET_KEYS.PLAYER_LEVEL_1, "assets/characters/1.png", { frameWidth: PLAYER_FRAME_SIZE, frameHeight: PLAYER_FRAME_SIZE });
         this.load.spritesheet(ASSET_KEYS.PLAYER_LEVEL_2, "assets/characters/2.png", { frameWidth: PLAYER_FRAME_SIZE, frameHeight: PLAYER_FRAME_SIZE });
         this.load.spritesheet(ASSET_KEYS.PLAYER_LEVEL_3, "assets/characters/3.png", { frameWidth: PLAYER_FRAME_SIZE, frameHeight: PLAYER_FRAME_SIZE });

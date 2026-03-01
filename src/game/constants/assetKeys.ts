@@ -4,6 +4,7 @@ export const ASSET_KEYS = {
     TEXT_LOGO: "text-logo",
     INTRO_VIDEO: "intro-video",
     MAP_LEVEL_1: "map-level-1",
+    CELL_POINT: "cell-point-img",
     PLAYER_LEVEL_1: "player-level-1",
     PLAYER_LEVEL_2: "player-level-2",
     PLAYER_LEVEL_3: "player-level-3",
