@@ -79,7 +79,7 @@ export class HudScene extends Scene {
     update(): void {
         if (this.escKey && Phaser.Input.Keyboard.JustDown(this.escKey)) {
             if (this.infoPanelVisible) {
-                this.goToMainMenu();
+                this.hideInfoPanel();
             } else {
                 this.showInfoPanel();
             }
@@ -230,15 +230,21 @@ export class HudScene extends Scene {
 
         const btnText = this.make.text({
             x: panelW * 0.5, y: rowY + 18,
-            text: "Ana Menüye Dön (ESC)",
+            text: "Ana Menüye Dön",
             style: { color: "#ff8888", fontFamily: "Verdana", fontSize: "14px", fontStyle: "bold" },
             origin: { x: 0.5, y: 0.5 },
             add: false
         });
 
+        const btnHitArea = this.add.zone(panelW * 0.5, rowY + 18, 200, 36).setOrigin(0.5).setInteractive();
+        btnHitArea.on("pointerdown", (_pointer: Phaser.Input.Pointer, _lx: number, _ly: number, event: Phaser.Types.Input.EventData) => {
+            event.stopPropagation();
+            this.goToMainMenu();
+        });
+
         const hintText = this.make.text({
             x: panelW * 0.5, y: panelH - 12,
-            text: "ESC: Ana Menü  |  Tıkla: Devam",
+            text: "ESC veya tıklama: Devam",
             style: { color: "#5aa8c8", fontFamily: "Verdana", fontSize: "12px" },
             origin: { x: 0.5, y: 1 },
             add: false
@@ -255,7 +261,7 @@ export class HudScene extends Scene {
             lbl7, this.infoSpeedText,
             lbl8, this.infoDashText,
             sep2, controlsText,
-            btnBg, btnText,
+            btnBg, btnText, btnHitArea,
             hintText
         ]).setDepth(200).setScrollFactor(0);
 
