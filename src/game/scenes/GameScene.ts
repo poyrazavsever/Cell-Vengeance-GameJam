@@ -18,6 +18,7 @@ import { SpawnPoint } from "../types/enemy";
 import { LevelDefinition } from "../types/level";
 import { LevelId } from "../types/progression";
 import { createMenuButton, createMenuCard, createMenuLabel } from "../ui/menuTheme";
+import { TutorialManager } from "../systems/TutorialManager";
 
 interface MovementKeys extends Phaser.Types.Input.Keyboard.CursorKeys {
     leftAlt: Phaser.Input.Keyboard.Key;
@@ -116,9 +117,11 @@ export class GameScene extends Scene {
     private isGrowthCinematicActive = false;
     private isDeathSequenceActive = false;
     private deathUiObjects: Phaser.GameObjects.GameObject[] = [];
+    private deathKeyBindings: Array<{ event: string; handler: () => void }> = [];
     private bossEnemy: EnemyBase | null = null;
     private bossDoorOpened = false;
     private lastBossHealth = -1;
+    private tutorialManager: TutorialManager | null = null;
 
     constructor() {
         super(SCENE_KEYS.GAME);
@@ -139,7 +142,7 @@ export class GameScene extends Scene {
         this.wasGroundedLastFrame = false;
         this.peakFallVelocity = 0;
         this.lastFallDamageAt = -Infinity;
-        this.previousGrowthStage = 0;
+        this.previousGrowthStage = snapshot.profile.growthStage;
         this.isDeathSequenceActive = false;
         this.clearDeathModal();
         this.bossEnemy = null;
@@ -200,7 +203,24 @@ export class GameScene extends Scene {
             this.levelDoor?.destroy();
             this.unsubscribeState?.();
             this.unsubscribeState = null;
+            this.tutorialManager?.destroy();
+            this.tutorialManager = null;
         });
+
+        // Start tutorial for Level 1
+        if (this.level.id === 1) {
+            this.tutorialManager = new TutorialManager(this, {
+                onPause: () => {
+                    this.physics.world.pause();
+                    this.player.setVelocity(0, 0);
+                    this.stopWalkSfx();
+                },
+                onResume: () => {
+                    this.physics.world.resume();
+                },
+                getPlayerX: () => this.player.x
+            });
+        }
     }
 
     update(time: number, delta: number): void {
@@ -210,14 +230,24 @@ export class GameScene extends Scene {
             return;
         }
 
-        if (!this.isGrowthCinematicActive) {
-            this.handlePlayerInput();
-            this.updateDoorInteraction();
-            this.enemyManager.update(this.player, time, delta);
+        // Tutorial must be checked FIRST so it can capture Enter key before door interaction.
+        if (this.tutorialManager) {
+            this.tutorialManager.update();
+            if (this.tutorialManager.isActive()) {
+                return;
+            }
         }
 
-        this.updateBossHealthHud();
+        if (this.isGrowthCinematicActive) {
+            this.updateBossHealthHud();
+            this.updatePlayerAttackHitboxPosition();
+            return;
+        }
 
+        this.handlePlayerInput();
+        this.updateDoorInteraction();
+        this.enemyManager.update(this.player, time, delta);
+        this.updateBossHealthHud();
         this.updateFallDamageTracking(time);
         this.updatePlayerAttackHitboxPosition();
         this.updateWalkSound();
@@ -651,6 +681,7 @@ export class GameScene extends Scene {
             if (enemy.kind === "boss") {
                 this.handleBossDefeated();
             }
+            this.tutorialManager?.onEnemyKilled();
         });
 
         this.bossEnemy = this.enemyManager.getBoss();
@@ -937,23 +968,25 @@ export class GameScene extends Scene {
                 return;
             }
 
-            this.player.setGrowthStage(snapshot.run.growthStage);
+            this.player.setGrowthStage(snapshot.profile.growthStage);
             this.attackDamage = snapshot.stats.attackDamage;
 
             this.registry.set("collectedCells", snapshot.run.collectedCells);
             this.registry.set("residualCells", snapshot.run.residualCells);
+            this.registry.set("growthSpentInLevel", snapshot.run.growthSpentInLevel);
+            this.registry.set("totalAbsorbedCells", snapshot.profile.totalAbsorbedCells);
             this.registry.set("health", snapshot.run.health);
             this.registry.set("wallet", snapshot.profile.walletPoints);
 
             EventBus.emit(EVENT_KEYS.PLAYER_PROGRESS_UPDATED, snapshot);
             EventBus.emit(EVENT_KEYS.PROFILE_UPDATED, snapshot.profile);
 
-            if (snapshot.run.growthStage > this.previousGrowthStage) {
+            if (snapshot.profile.growthStage > this.previousGrowthStage) {
                 this.startGrowthCinematic();
                 EventBus.emit(EVENT_KEYS.PLAYER_GROWTH_STAGE_CHANGED, snapshot);
             }
 
-            this.previousGrowthStage = snapshot.run.growthStage;
+            this.previousGrowthStage = snapshot.profile.growthStage;
         });
     }
 
@@ -1090,8 +1123,7 @@ export class GameScene extends Scene {
         const backdrop = this.add
             .rectangle(width * 0.5, height * 0.5, width, height, 0x000000, 0.72)
             .setScrollFactor(0)
-            .setDepth(220)
-            .setInteractive();
+            .setDepth(220);
 
         const card = createMenuCard(this, { x: width * 0.5, y: height * 0.5, width: 520, height: 320, alpha: 0.96 });
         card.setScrollFactor(0).setDepth(221);
@@ -1131,11 +1163,26 @@ export class GameScene extends Scene {
         mainMenuButton.root.setScrollFactor(0).setDepth(222);
 
         this.deathUiObjects = [backdrop, card, title, subtitle, restartButton.root, mainMenuButton.root];
+
+        const restartHandler = () => this.restartLevelAfterDeath();
+        const menuHandler = () => this.returnToMainMenuAfterDeath();
+        this.deathKeyBindings = [
+            { event: "keydown-ENTER", handler: restartHandler },
+            { event: "keydown-R", handler: restartHandler },
+            { event: "keydown-ESC", handler: menuHandler }
+        ];
+        this.deathKeyBindings.forEach(({ event, handler }) => {
+            this.input.keyboard?.once(event, handler);
+        });
     }
 
     private clearDeathModal(): void {
         this.deathUiObjects.forEach((object) => object.destroy());
         this.deathUiObjects = [];
+        this.deathKeyBindings.forEach(({ event, handler }) => {
+            this.input.keyboard?.off(event, handler);
+        });
+        this.deathKeyBindings = [];
     }
 
     private restartLevelAfterDeath(): void {

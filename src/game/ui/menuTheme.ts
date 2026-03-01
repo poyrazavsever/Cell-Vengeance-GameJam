@@ -119,6 +119,7 @@ export const createMenuButton = (scene: Scene, options: MenuButtonOptions): Menu
     }).setOrigin(0.5);
 
     const container = scene.add.container(options.x, options.y, [outer, inner, label]);
+    container.setSize(width, height);
 
     let enabled = enabledAtStart;
     const applyVisual = () => {
@@ -136,25 +137,25 @@ export const createMenuButton = (scene: Scene, options: MenuButtonOptions): Menu
 
     applyVisual();
 
-    outer.setInteractive({ useHandCursor: true });
-    outer.on("pointerover", () => {
+    container.setInteractive({ useHandCursor: true });
+    container.on("pointerover", () => {
         if (!enabled) {
             return;
         }
 
         container.setScale(1.02);
     });
-    outer.on("pointerout", () => {
+    container.on("pointerout", () => {
         container.setScale(1);
     });
-    outer.on("pointerdown", () => {
+    container.on("pointerdown", () => {
         if (!enabled) {
             return;
         }
 
         container.setScale(0.985);
     });
-    outer.on("pointerup", () => {
+    container.on("pointerup", () => {
         if (!enabled) {
             return;
         }
@@ -168,9 +169,9 @@ export const createMenuButton = (scene: Scene, options: MenuButtonOptions): Menu
         setEnabled: (nextEnabled: boolean) => {
             enabled = nextEnabled;
             applyVisual();
-            outer.disableInteractive();
+            container.disableInteractive();
             if (enabled) {
-                outer.setInteractive({ useHandCursor: true });
+                container.setInteractive({ useHandCursor: true });
             }
         },
         setLabel: (nextLabel: string) => {

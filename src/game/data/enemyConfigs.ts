@@ -12,6 +12,8 @@ export const ENEMY_CONFIGS: Record<EnemyKind, EnemyConfig> = {
         attackDuration: 300,
         recoverDuration: 1000,
         hitDuration: 180,
+        calmAfterAttacks: 2,
+        calmDuration: 1400,
         contactDamage: 1,
         contactCooldown: 700,
         attackDamage: 1,

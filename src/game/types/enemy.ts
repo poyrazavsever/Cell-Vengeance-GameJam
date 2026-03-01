@@ -17,6 +17,8 @@ export interface EnemyConfig {
     attackDuration: number;
     recoverDuration: number;
     hitDuration: number;
+    calmAfterAttacks?: number;
+    calmDuration?: number;
     contactDamage: number;
     contactCooldown: number;
     attackDamage: number;
