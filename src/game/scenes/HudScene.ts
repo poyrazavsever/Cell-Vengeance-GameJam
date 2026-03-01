@@ -3,6 +3,7 @@ import { EventBus } from "../EventBus";
 import { EVENT_KEYS } from "../constants/eventKeys";
 import { GROWTH_STAGE_INFO } from "../data/growthConfig";
 import { SCENE_KEYS } from "../constants/sceneKeys";
+import { gameState } from "../state/GameState";
 import { GameSnapshot } from "../types/progression";
 
 const HEART_FULL_COLOR = 0xff4466;
@@ -70,12 +71,15 @@ export class HudScene extends Scene {
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
             EventBus.off(EVENT_KEYS.PLAYER_PROGRESS_UPDATED, this.handleProgressUpdated, this);
         });
+
+        // Initialize HUD with current state immediately
+        this.handleProgressUpdated(gameState.getSnapshot());
     }
 
     update(): void {
         if (this.escKey && Phaser.Input.Keyboard.JustDown(this.escKey)) {
             if (this.infoPanelVisible) {
-                this.hideInfoPanel();
+                this.goToMainMenu();
             } else {
                 this.showInfoPanel();
             }
@@ -126,8 +130,8 @@ export class HudScene extends Scene {
 
     private createInfoPanel(): void {
         const { width, height } = this.scale;
-        const panelW = 380;
-        const panelH = 338;
+        const panelW = 400;
+        const panelH = 480;
         const px = (width - panelW) * 0.5;
         const py = (height - panelH) * 0.5;
 
@@ -197,11 +201,45 @@ export class HudScene extends Scene {
 
         const lbl8 = this.make.text({ x: leftCol, y: rowY, text: "Atılma (Dash):", style: labelStyle, add: false });
         this.infoDashText = this.make.text({ x: rightCol, y: rowY, text: "Kapalı", style: valueStyle, origin: { x: 1, y: 0 }, add: false });
+        rowY += 36;
+
+        // --- Controls section ---
+        const sep2 = new Phaser.GameObjects.Graphics(this);
+        sep2.lineStyle(1, 0x4ac8ff, 0.4);
+        sep2.lineBetween(20, rowY, panelW - 20, rowY);
+        rowY += 12;
+
+        const controlStyle: Phaser.Types.GameObjects.Text.TextStyle = {
+            color: "#5aa8c8", fontFamily: "Verdana", fontSize: "13px"
+        };
+        const controlsText = this.make.text({
+            x: panelW * 0.5, y: rowY,
+            text: "A/D: Hareket  |  J: Saldırı  |  Space/W: Zıpla  |  Shift: Dash",
+            style: controlStyle,
+            origin: { x: 0.5, y: 0 },
+            add: false
+        });
+        rowY += 30;
+
+        // --- Main menu button ---
+        const btnBg = new Phaser.GameObjects.Graphics(this);
+        btnBg.fillStyle(0x1a3a50, 1);
+        btnBg.fillRoundedRect(panelW * 0.5 - 100, rowY, 200, 36, 8);
+        btnBg.lineStyle(1, 0x4ac8ff, 0.6);
+        btnBg.strokeRoundedRect(panelW * 0.5 - 100, rowY, 200, 36, 8);
+
+        const btnText = this.make.text({
+            x: panelW * 0.5, y: rowY + 18,
+            text: "Ana Menüye Dön (ESC)",
+            style: { color: "#ff8888", fontFamily: "Verdana", fontSize: "14px", fontStyle: "bold" },
+            origin: { x: 0.5, y: 0.5 },
+            add: false
+        });
 
         const hintText = this.make.text({
-            x: panelW * 0.5, y: panelH - 16,
-            text: "ESC ile kapat",
-            style: { color: "#5aa8c8", fontFamily: "Verdana", fontSize: "13px" },
+            x: panelW * 0.5, y: panelH - 12,
+            text: "ESC: Ana Menü  |  Tıkla: Devam",
+            style: { color: "#5aa8c8", fontFamily: "Verdana", fontSize: "12px" },
             origin: { x: 0.5, y: 1 },
             add: false
         });
@@ -216,8 +254,17 @@ export class HudScene extends Scene {
             lbl6, this.infoAtkText,
             lbl7, this.infoSpeedText,
             lbl8, this.infoDashText,
+            sep2, controlsText,
+            btnBg, btnText,
             hintText
         ]).setDepth(200).setScrollFactor(0);
+
+        // Click anywhere on panel to close (resume)
+        this.infoPanelContainer.setSize(panelW, panelH);
+        this.infoPanelContainer.setInteractive();
+        this.infoPanelContainer.on("pointerdown", () => {
+            this.hideInfoPanel();
+        });
 
         this.infoPanelContainer.setVisible(false);
     }
@@ -245,6 +292,16 @@ export class HudScene extends Scene {
         if (gameScene) {
             gameScene.scene.resume();
         }
+    }
+
+    private goToMainMenu(): void {
+        this.infoPanelVisible = false;
+        this.infoPanelContainer.setVisible(false);
+
+        // Stop game and HUD, go to main menu
+        this.scene.stop(SCENE_KEYS.GAME);
+        this.scene.stop(SCENE_KEYS.HUD);
+        this.scene.start(SCENE_KEYS.MAIN_MENU);
     }
 
     private refreshInfoPanel(snapshot: GameSnapshot): void {

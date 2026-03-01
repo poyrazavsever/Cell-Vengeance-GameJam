@@ -133,11 +133,6 @@ export class GameScene extends Scene {
         this.configureCamera();
         this.ensureHudScene();
 
-        this.add.text(20, 152, "A/D veya Sol/Sağ: Hareket | J: Saldırı | Space/W: Zıpla | Shift: Dash", {
-            color: "#d7f6ff",
-            fontFamily: "Verdana",
-            fontSize: "18px"
-        }).setDepth(10).setScrollFactor(0);
 
         this.doorHintText = this.add.text(512, 188, "Kapıya girmek için Enter bas", {
             color: "#c8f7ff",
